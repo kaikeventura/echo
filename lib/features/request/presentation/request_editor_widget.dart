@@ -89,7 +89,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           child: TabBarView(
             controller: _tabController,
             children: [
-              const Center(child: Text('Params (Not implemented yet)')),
+              _buildParamsTab(activeRequest),
               _buildHeadersTab(activeRequest),
               _buildBodyTab(activeRequest),
             ],
@@ -186,6 +186,60 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildParamsTab(RequestModel request) {
+    Map<String, String> params = {};
+    try {
+      if (request.url.isNotEmpty) {
+        final uri = Uri.parse(request.url);
+        params = Map.from(uri.queryParameters);
+      }
+    } catch (e) {
+      // Ignore parse errors for now, or show empty params
+    }
+
+    return KeyValueTable(
+      items: params,
+      onChanged: (key, value, oldKey) {
+        try {
+          final uri = request.url.isNotEmpty ? Uri.parse(request.url) : Uri();
+          final currentParams = Map<String, String>.from(uri.queryParameters);
+
+          if (oldKey.isNotEmpty && oldKey != key) {
+            currentParams.remove(oldKey);
+          }
+          
+          if (key.isNotEmpty) {
+            currentParams[key] = value;
+          } else if (oldKey.isNotEmpty && key.isEmpty) {
+             // Case where key is cleared? KeyValueTable usually handles this by not calling onChanged with empty key unless it's a new row.
+             // But if user clears key, we might want to remove it?
+             // The KeyValueTable implementation calls onChanged with empty key if we clear it?
+             // Let's assume if key is empty, we don't add it to params map.
+          }
+
+          final newUri = uri.replace(queryParameters: currentParams);
+          request.url = newUri.toString();
+          _saveRequest(request);
+        } catch (e) {
+          // Handle error
+        }
+      },
+      onDeleted: (key) {
+        try {
+          final uri = request.url.isNotEmpty ? Uri.parse(request.url) : Uri();
+          final currentParams = Map<String, String>.from(uri.queryParameters);
+          currentParams.remove(key);
+          
+          final newUri = uri.replace(queryParameters: currentParams);
+          request.url = newUri.toString();
+          _saveRequest(request);
+        } catch (e) {
+          // Handle error
+        }
+      },
     );
   }
 
