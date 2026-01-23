@@ -224,7 +224,7 @@ class SidebarWidget extends ConsumerWidget {
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 if (nameController.text.isNotEmpty &&
                     selectedCollection != null) {
                   final newRequest = RequestModel()
@@ -233,11 +233,18 @@ class SidebarWidget extends ConsumerWidget {
                     ..url = ''
                     ..savedAt = DateTime.now();
                   
-                  ref.read(collectionsProvider.notifier).addRequestToCollection(
+                  // 1. Adiciona a request ao banco
+                  await ref.read(collectionsProvider.notifier).addRequestToCollection(
                         selectedCollection!.id,
                         newRequest,
                       );
-                  Navigator.pop(context);
+                  
+                  // 2. Abre a request imediatamente em uma nova aba
+                  // Como o objeto newRequest agora tem um ID (gerado pelo Isar), podemos usá-lo
+                  if (context.mounted) {
+                    ref.read(openRequestsProvider.notifier).openRequest(newRequest);
+                    Navigator.pop(context);
+                  }
                 }
               },
               child: const Text('Create'),
