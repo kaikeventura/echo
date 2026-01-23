@@ -203,28 +203,36 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     return KeyValueTable(
       items: headersMap,
       onChanged: (key, value, oldKey) {
-        // Update the request model
-        request.headers ??= [];
+        // Create a new list instead of modifying the existing one directly
+        final newHeaders = request.headers != null 
+            ? List<RequestHeader>.from(request.headers!) 
+            : <RequestHeader>[];
         
-        // If oldKey is empty, it's a new item
         if (oldKey.isEmpty) {
-          request.headers!.add(RequestHeader()..key = key..value = value);
+          // Add new
+          newHeaders.add(RequestHeader()..key = key..value = value);
         } else {
-          // Find and update
-          final index = request.headers!.indexWhere((h) => h.key == oldKey);
+          // Update
+          final index = newHeaders.indexWhere((h) => h.key == oldKey);
           if (index != -1) {
-            request.headers![index].key = key;
-            request.headers![index].value = value;
+            newHeaders[index].key = key;
+            newHeaders[index].value = value;
           } else {
-            // Fallback if not found (shouldn't happen with correct logic)
-             request.headers!.add(RequestHeader()..key = key..value = value);
+            // Fallback: add if not found
+             newHeaders.add(RequestHeader()..key = key..value = value);
           }
         }
+        
+        request.headers = newHeaders;
         _saveRequest(request);
       },
       onDeleted: (key) {
-        request.headers?.removeWhere((h) => h.key == key);
-        _saveRequest(request);
+        if (request.headers != null) {
+          final newHeaders = List<RequestHeader>.from(request.headers!);
+          newHeaders.removeWhere((h) => h.key == key);
+          request.headers = newHeaders;
+          _saveRequest(request);
+        }
       },
     );
   }
@@ -364,5 +372,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
   void _saveRequest(RequestModel request) {
     ref.read(collectionsProvider.notifier).updateRequest(request);
+    setState(() {});
   }
 }
