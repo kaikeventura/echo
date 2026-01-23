@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,6 +21,17 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   late TabController _tabController;
   late TextEditingController _urlController;
   late TextEditingController _bodyController;
+
+  // Estado de validação
+  String? _bodyError;
+
+  final Map<String, String> _contentTypes = {
+    'No Body': '',
+    'JSON': 'application/json',
+    'Text': 'text/plain',
+    'XML': 'application/xml',
+    'Form URL Encoded': 'application/x-www-form-urlencoded',
+  };
 
   @override
   void initState() {
@@ -61,8 +73,11 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     if (_urlController.text != activeRequest.url) {
       _urlController.text = activeRequest.url;
     }
+    // Only update body controller if it's different to avoid cursor jumping
     if (_bodyController.text != (activeRequest.body ?? '')) {
       _bodyController.text = activeRequest.body ?? '';
+      // Re-validate on load
+      _validateBody(activeRequest.body ?? '', _getCurrentContentType(activeRequest));
     }
 
     return Column(
@@ -197,7 +212,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
         params = Map.from(uri.queryParameters);
       }
     } catch (e) {
-      // Ignore parse errors for now, or show empty params
+      // Ignore parse errors
     }
 
     return KeyValueTable(
@@ -213,11 +228,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           
           if (key.isNotEmpty) {
             currentParams[key] = value;
-          } else if (oldKey.isNotEmpty && key.isEmpty) {
-             // Case where key is cleared? KeyValueTable usually handles this by not calling onChanged with empty key unless it's a new row.
-             // But if user clears key, we might want to remove it?
-             // The KeyValueTable implementation calls onChanged with empty key if we clear it?
-             // Let's assume if key is empty, we don't add it to params map.
           }
 
           final newUri = uri.replace(queryParameters: currentParams);
@@ -244,7 +254,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   Widget _buildHeadersTab(RequestModel request) {
-    // Convert List<RequestHeader> to Map<String, String> for the widget
     final headersMap = <String, String>{};
     if (request.headers != null) {
       for (var h in request.headers!) {
@@ -257,22 +266,18 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     return KeyValueTable(
       items: headersMap,
       onChanged: (key, value, oldKey) {
-        // Create a new list instead of modifying the existing one directly
         final newHeaders = request.headers != null 
             ? List<RequestHeader>.from(request.headers!) 
             : <RequestHeader>[];
         
         if (oldKey.isEmpty) {
-          // Add new
           newHeaders.add(RequestHeader()..key = key..value = value);
         } else {
-          // Update
           final index = newHeaders.indexWhere((h) => h.key == oldKey);
           if (index != -1) {
             newHeaders[index].key = key;
             newHeaders[index].value = value;
           } else {
-            // Fallback: add if not found
              newHeaders.add(RequestHeader()..key = key..value = value);
           }
         }
@@ -292,6 +297,149 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   Widget _buildBodyTab(RequestModel request) {
+    final currentType = _getCurrentContentType(request);
+
+    return Column(
+      children: [
+        // Body Toolbar
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Colors.white10)),
+          ),
+          child: Row(
+            children: [
+              DropdownButton<String>(
+                value: _contentTypes.containsKey(currentType) ? currentType : 'No Body',
+                dropdownColor: const Color(0xFF2D2D2D),
+                underline: Container(),
+                style: GoogleFonts.inter(fontSize: 12, color: Colors.white),
+                items: _contentTypes.keys.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Text(type),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    _updateContentType(request, _contentTypes[val]!);
+                  }
+                },
+              ),
+              const Spacer(),
+              if (currentType == 'JSON' || currentType == 'XML')
+                TextButton.icon(
+                  onPressed: () => _prettifyBody(request, currentType),
+                  icon: const Icon(Icons.auto_fix_high, size: 14),
+                  label: Text('Prettify', style: GoogleFonts.inter(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.secondary,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // Validation Error Banner
+        if (_bodyError != null && currentType != 'No Body' && currentType != 'Form URL Encoded')
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: Colors.red.withOpacity(0.1),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, size: 14, color: Colors.redAccent),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _bodyError!,
+                    style: GoogleFonts.inter(fontSize: 11, color: Colors.redAccent),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        
+        // Editor Content
+        Expanded(
+          child: _buildBodyContent(request, currentType),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBodyContent(RequestModel request, String type) {
+    switch (type) {
+      case 'No Body':
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.block, size: 48, color: Colors.white10),
+              const SizedBox(height: 16),
+              Text(
+                'This request has no body',
+                style: GoogleFonts.inter(color: Colors.white24),
+              ),
+            ],
+          ),
+        );
+      
+      case 'Form URL Encoded':
+        return _buildUrlEncodedEditor(request);
+
+      default:
+        return _buildCodeEditor(request, type);
+    }
+  }
+
+  Widget _buildUrlEncodedEditor(RequestModel request) {
+    // Parse body string "key=value&a=b" to Map
+    Map<String, String> formData = {};
+    try {
+      if (request.body != null && request.body!.isNotEmpty) {
+        // Use Uri to parse query string
+        final uri = Uri(query: request.body);
+        formData = Map.from(uri.queryParameters);
+      }
+    } catch (e) {
+      // If parse fails, start empty
+    }
+
+    return KeyValueTable(
+      items: formData,
+      onChanged: (key, value, oldKey) {
+        final currentData = Map<String, String>.from(formData);
+        
+        if (oldKey.isNotEmpty && oldKey != key) {
+          currentData.remove(oldKey);
+        }
+        if (key.isNotEmpty) {
+          currentData[key] = value;
+        }
+
+        // Convert back to query string
+        final newUri = Uri(queryParameters: currentData);
+        request.body = newUri.query;
+        _saveRequest(request);
+      },
+      onDeleted: (key) {
+        final currentData = Map<String, String>.from(formData);
+        currentData.remove(key);
+        final newUri = Uri(queryParameters: currentData);
+        request.body = newUri.query;
+        _saveRequest(request);
+      },
+    );
+  }
+
+  Widget _buildCodeEditor(RequestModel request, String type) {
+    String hint = '';
+    if (type == 'JSON') hint = '{\n  "key": "value"\n}';
+    else if (type == 'XML') hint = '<root>\n  <key>value</key>\n</root>';
+    else hint = 'Enter text content here...';
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: TextField(
@@ -307,19 +455,26 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Colors.white10),
+            borderSide: BorderSide(
+              color: _bodyError != null ? Colors.red.withOpacity(0.5) : Colors.white10
+            ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+            borderSide: BorderSide(
+              color: _bodyError != null 
+                  ? Colors.redAccent 
+                  : Theme.of(context).colorScheme.primary.withOpacity(0.5)
+            ),
           ),
           filled: true,
           fillColor: const Color(0xFF1E1E1E),
-          hintText: '{\n  "key": "value"\n}',
+          hintText: hint,
           hintStyle: GoogleFonts.jetBrainsMono(color: Colors.white24),
         ),
         onChanged: (val) {
           request.body = val;
+          _validateBody(val, type);
           _saveRequest(request);
         },
       ),
@@ -341,6 +496,11 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
               ),
             );
           }
+
+          // Try to format body if it's JSON
+          String displayBody = response.body.toString();
+          displayBody = _tryFormatJson(displayBody);
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -364,7 +524,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
                   color: const Color(0xFF1E1E1E),
                   child: SingleChildScrollView(
                     child: SelectableText(
-                      response.body.toString(),
+                      displayBody,
                       style: GoogleFonts.jetBrainsMono(fontSize: 12, height: 1.5),
                     ),
                   ),
@@ -427,5 +587,142 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   void _saveRequest(RequestModel request) {
     ref.read(collectionsProvider.notifier).updateRequest(request);
     setState(() {});
+  }
+
+  String _getCurrentContentType(RequestModel request) {
+    final contentTypeHeader = request.headers?.firstWhere(
+      (h) => h.key?.toLowerCase() == 'content-type',
+      orElse: () => RequestHeader(),
+    );
+    
+    if (contentTypeHeader?.value != null) {
+      final val = contentTypeHeader!.value!.toLowerCase();
+      if (val.contains('json')) return 'JSON';
+      if (val.contains('xml')) return 'XML';
+      if (val.contains('text')) return 'Text';
+      if (val.contains('urlencoded')) return 'Form URL Encoded';
+    }
+    return 'No Body';
+  }
+
+  void _updateContentType(RequestModel request, String mimeType) {
+    final newHeaders = request.headers != null 
+        ? List<RequestHeader>.from(request.headers!) 
+        : <RequestHeader>[];
+    
+    final index = newHeaders.indexWhere((h) => h.key?.toLowerCase() == 'content-type');
+    
+    if (mimeType.isEmpty) {
+      if (index != -1) {
+        newHeaders.removeAt(index);
+      }
+      request.body = ''; // Clear body if No Body selected
+      _bodyController.clear();
+      _bodyError = null;
+    } else {
+      if (index != -1) {
+        newHeaders[index].value = mimeType;
+      } else {
+        newHeaders.add(RequestHeader()..key = 'Content-Type'..value = mimeType);
+      }
+    }
+
+    request.headers = newHeaders;
+    _saveRequest(request);
+  }
+
+  void _validateBody(String text, String type) {
+    if (text.isEmpty) {
+      setState(() => _bodyError = null);
+      return;
+    }
+
+    if (type == 'JSON') {
+      try {
+        json.decode(text);
+        setState(() => _bodyError = null);
+      } catch (e) {
+        setState(() => _bodyError = 'Invalid JSON: ${e.toString()}');
+      }
+    } else if (type == 'XML') {
+      // Basic XML validation (check for root element)
+      if (!text.trim().startsWith('<') || !text.trim().endsWith('>')) {
+         setState(() => _bodyError = 'Invalid XML format');
+      } else {
+         setState(() => _bodyError = null);
+      }
+    } else {
+      setState(() => _bodyError = null);
+    }
+  }
+
+  void _prettifyBody(RequestModel request, String type) {
+    final text = _bodyController.text;
+    if (text.isEmpty) return;
+
+    String formatted = text;
+    if (type == 'JSON') {
+      formatted = _tryFormatJson(text);
+    } else if (type == 'XML') {
+      formatted = _tryFormatXml(text);
+    }
+
+    if (formatted != text) {
+      request.body = formatted;
+      _bodyController.text = formatted;
+      _saveRequest(request);
+      _validateBody(formatted, type);
+    }
+  }
+
+  String _tryFormatJson(String text) {
+    try {
+      final dynamic parsed = json.decode(text);
+      final encoder = const JsonEncoder.withIndent('  ');
+      return encoder.convert(parsed);
+    } catch (e) {
+      return text;
+    }
+  }
+
+  String _tryFormatXml(String text) {
+    // Simple XML indenter without external dependencies
+    try {
+      var xml = text.trim();
+      // Remove existing newlines and extra spaces between tags
+      xml = xml.replaceAll(RegExp(r'>\s+<'), '><');
+      
+      var indent = 0;
+      var result = StringBuffer();
+      
+      for (var i = 0; i < xml.length; i++) {
+        var char = xml[i];
+        
+        if (char == '<') {
+          // Check if closing tag
+          if (i + 1 < xml.length && xml[i + 1] == '/') {
+            indent--;
+            if (indent < 0) indent = 0;
+            result.write('\n${'  ' * indent}');
+          } else {
+             // Open tag
+             if (result.isNotEmpty) result.write('\n${'  ' * indent}');
+             indent++;
+          }
+        }
+        
+        result.write(char);
+        
+        if (char == '>') {
+           // Check if self-closing
+           if (i - 1 >= 0 && xml[i - 1] == '/') {
+             indent--;
+           }
+        }
+      }
+      return result.toString().trim();
+    } catch (e) {
+      return text;
+    }
   }
 }
