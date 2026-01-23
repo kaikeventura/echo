@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../models/request_model.dart';
 import '../../../providers/active_request_provider.dart';
 import '../../../providers/request_execution_provider.dart';
 import '../../../providers/collections_provider.dart';
+import '../../../utils/http_colors.dart';
+import '../../../widgets/key_value_table.dart';
 
 class RequestEditorWidget extends ConsumerStatefulWidget {
   const RequestEditorWidget({super.key});
@@ -39,8 +42,18 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     final activeRequest = ref.watch(activeRequestProvider);
 
     if (activeRequest == null) {
-      return const Center(
-        child: Text('Select a request to start'),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.bolt, size: 64, color: Colors.white10),
+            const SizedBox(height: 16),
+            Text(
+              'Select a request to start',
+              style: GoogleFonts.inter(color: Colors.white38),
+            ),
+          ],
+        ),
       );
     }
 
@@ -55,8 +68,17 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     return Column(
       children: [
         _buildTopBar(context, ref, activeRequest),
+        Container(
+          height: 1,
+          color: Colors.white10,
+        ),
         TabBar(
           controller: _tabController,
+          labelColor: Theme.of(context).colorScheme.primary,
+          unselectedLabelColor: Colors.white54,
+          indicatorColor: Theme.of(context).colorScheme.primary,
+          dividerColor: Colors.transparent,
+          labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
           tabs: const [
             Tab(text: 'Params'),
             Tab(text: 'Headers'),
@@ -73,7 +95,10 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             ],
           ),
         ),
-        const Divider(),
+        Container(
+          height: 1,
+          color: Colors.white10,
+        ),
         _buildResponsePanel(ref),
       ],
     );
@@ -85,33 +110,53 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          DropdownButton<String>(
-            value: request.method,
-            items: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
-                .map((m) => DropdownMenuItem(
-                      value: m,
-                      child: Text(
-                        m,
-                        style: TextStyle(
-                            color: _getMethodColor(m),
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ))
-                .toList(),
-            onChanged: (val) {
-              if (val != null) {
-                request.method = val;
-                _saveRequest(request);
-              }
-            },
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: request.method,
+                dropdownColor: const Color(0xFF2D2D2D),
+                items: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+                    .map((m) => DropdownMenuItem(
+                          value: m,
+                          child: Text(
+                            m,
+                            style: GoogleFonts.inter(
+                                color: HttpColors.getMethodColor(m),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13),
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    request.method = val;
+                    _saveRequest(request);
+                  }
+                },
+              ),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: TextField(
               controller: _urlController,
-              decoration: const InputDecoration(
-                hintText: 'Enter request URL',
-                border: OutlineInputBorder(),
+              style: GoogleFonts.inter(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'https://api.example.com/v1/users',
+                hintStyle: GoogleFonts.inter(color: Colors.white24),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                prefixIcon: const Icon(Icons.link, color: Colors.white24, size: 18),
               ),
               onChanged: (val) {
                 request.url = val;
@@ -120,12 +165,24 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             ),
           ),
           const SizedBox(width: 16),
-          ElevatedButton.icon(
-            onPressed: () {
-              ref.read(requestExecutionProvider.notifier).execute();
-            },
-            icon: const Icon(Icons.send),
-            label: const Text('Send'),
+          SizedBox(
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                ref.read(requestExecutionProvider.notifier).execute();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+              ),
+              icon: const Icon(Icons.send, size: 18),
+              label: Text('Send', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+            ),
           ),
         ],
       ),
@@ -133,56 +190,42 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   Widget _buildHeadersTab(RequestModel request) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (request.headers != null)
-          ...request.headers!.asMap().entries.map((entry) {
-            final index = entry.key;
-            final header = entry.value;
-            return Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    initialValue: header.key,
-                    decoration: const InputDecoration(labelText: 'Key'),
-                    onChanged: (val) {
-                      header.key = val;
-                      _saveRequest(request);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    initialValue: header.value,
-                    decoration: const InputDecoration(labelText: 'Value'),
-                    onChanged: (val) {
-                      header.value = val;
-                      _saveRequest(request);
-                    },
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: () {
-                    request.headers!.removeAt(index);
-                    _saveRequest(request);
-                  },
-                ),
-              ],
-            );
-          }),
-        TextButton.icon(
-          onPressed: () {
-            request.headers ??= [];
-            request.headers!.add(RequestHeader());
-            _saveRequest(request);
-          },
-          icon: const Icon(Icons.add),
-          label: const Text('Add Header'),
-        ),
-      ],
+    // Convert List<RequestHeader> to Map<String, String> for the widget
+    final headersMap = <String, String>{};
+    if (request.headers != null) {
+      for (var h in request.headers!) {
+        if (h.key != null && h.key!.isNotEmpty) {
+          headersMap[h.key!] = h.value ?? '';
+        }
+      }
+    }
+
+    return KeyValueTable(
+      items: headersMap,
+      onChanged: (key, value, oldKey) {
+        // Update the request model
+        request.headers ??= [];
+        
+        // If oldKey is empty, it's a new item
+        if (oldKey.isEmpty) {
+          request.headers!.add(RequestHeader()..key = key..value = value);
+        } else {
+          // Find and update
+          final index = request.headers!.indexWhere((h) => h.key == oldKey);
+          if (index != -1) {
+            request.headers![index].key = key;
+            request.headers![index].value = value;
+          } else {
+            // Fallback if not found (shouldn't happen with correct logic)
+             request.headers!.add(RequestHeader()..key = key..value = value);
+          }
+        }
+        _saveRequest(request);
+      },
+      onDeleted: (key) {
+        request.headers?.removeWhere((h) => h.key == key);
+        _saveRequest(request);
+      },
     );
   }
 
@@ -194,9 +237,24 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
         maxLines: null,
         expands: true,
         textAlignVertical: TextAlignVertical.top,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          hintText: 'Request Body (JSON, Text, etc.)',
+        style: GoogleFonts.jetBrainsMono(fontSize: 13, height: 1.5),
+        decoration: InputDecoration(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.white10),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.white10),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+          ),
+          filled: true,
+          fillColor: const Color(0xFF1E1E1E),
+          hintText: '{\n  "key": "value"\n}',
+          hintStyle: GoogleFonts.jetBrainsMono(color: Colors.white24),
         ),
         onChanged: (val) {
           request.body = val;
@@ -214,60 +272,94 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       child: executionState.when(
         data: (response) {
           if (response == null) {
-            return const Center(child: Text('No response yet'));
+            return Center(
+              child: Text(
+                'Ready to send request',
+                style: GoogleFonts.inter(color: Colors.white24),
+              ),
+            );
           }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                color: const Color(0xFF252526),
                 child: Row(
                   children: [
-                    Text(
-                      'Status: ${response.statusCode}',
-                      style: TextStyle(
-                        color: response.statusCode >= 200 && response.statusCode < 300
-                            ? Colors.green
-                            : Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text('Time: ${response.executionTimeMs}ms'),
-                    const SizedBox(width: 16),
-                    Text('Size: ${response.responseSizeBytes} B'),
+                    _buildStatusBadge(response.statusCode),
+                    const SizedBox(width: 24),
+                    _buildMetric(Icons.timer_outlined, '${response.executionTimeMs}ms'),
+                    const SizedBox(width: 24),
+                    _buildMetric(Icons.data_usage, '${response.responseSizeBytes} B'),
                   ],
                 ),
               ),
-              const Divider(),
               Expanded(
-                child: SingleChildScrollView(
+                child: Container(
+                  width: double.infinity,
                   padding: const EdgeInsets.all(16),
-                  child: SelectableText(response.body.toString()),
+                  color: const Color(0xFF1E1E1E),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      response.body.toString(),
+                      style: GoogleFonts.jetBrainsMono(fontSize: 12, height: 1.5),
+                    ),
+                  ),
                 ),
               ),
             ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+        error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red))),
       ),
     );
   }
 
-  Color _getMethodColor(String method) {
-    switch (method.toUpperCase()) {
-      case 'GET':
-        return Colors.green;
-      case 'POST':
-        return Colors.orange;
-      case 'PUT':
-        return Colors.blue;
-      case 'DELETE':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
+  Widget _buildStatusBadge(int statusCode) {
+    final color = HttpColors.getStatusCodeColor(statusCode);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$statusCode',
+            style: GoogleFonts.inter(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetric(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.white54),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: GoogleFonts.inter(color: Colors.white70, fontSize: 12),
+        ),
+      ],
+    );
   }
 
   void _saveRequest(RequestModel request) {
