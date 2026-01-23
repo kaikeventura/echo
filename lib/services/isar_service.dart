@@ -2,6 +2,7 @@ import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/request_model.dart';
 import '../models/collection_model.dart';
+import '../models/session_model.dart';
 
 class IsarService {
   static final IsarService _instance = IsarService._internal();
@@ -18,7 +19,7 @@ class IsarService {
     if (Isar.instanceNames.isEmpty) {
       final dir = await getApplicationDocumentsDirectory();
       return await Isar.open(
-        [RequestModelSchema, CollectionModelSchema],
+        [RequestModelSchema, CollectionModelSchema, SessionModelSchema],
         directory: dir.path,
         inspector: true,
       );

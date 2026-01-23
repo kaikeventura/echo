@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../models/collection_model.dart';
 import '../../../models/request_model.dart';
 import '../../../providers/active_request_provider.dart';
 import '../../../providers/collections_provider.dart';
+import '../../../providers/open_requests_provider.dart';
+import '../../../utils/http_colors.dart';
 
 class SidebarWidget extends ConsumerWidget {
   const SidebarWidget({super.key});
@@ -44,20 +47,24 @@ class SidebarWidget extends ConsumerWidget {
         children: [
           Text(
             'Collections',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.white70,
+            ),
           ),
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.create_new_folder_outlined, size: 20),
+                icon: const Icon(Icons.create_new_folder_outlined, size: 18),
                 tooltip: 'New Collection',
+                splashRadius: 20,
                 onPressed: () => _showCreateCollectionDialog(context, ref),
               ),
               IconButton(
-                icon: const Icon(Icons.note_add_outlined, size: 20),
+                icon: const Icon(Icons.note_add_outlined, size: 18),
                 tooltip: 'New Request',
+                splashRadius: 20,
                 onPressed: () => _showCreateRequestDialog(context, ref),
               ),
             ],
@@ -69,14 +76,23 @@ class SidebarWidget extends ConsumerWidget {
 
   Widget _buildCollectionTile(
       BuildContext context, WidgetRef ref, CollectionModel collection) {
-    return ExpansionTile(
-      title: Text(
-        collection.name,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        title: Text(
+          collection.name,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.white70,
+          ),
+        ),
+        iconColor: Colors.white54,
+        collapsedIconColor: Colors.white38,
+        children: collection.requests.map((request) {
+          return _buildRequestTile(context, ref, request);
+        }).toList(),
       ),
-      children: collection.requests.map((request) {
-        return _buildRequestTile(context, ref, request);
-      }).toList(),
     );
   }
 
@@ -85,45 +101,41 @@ class SidebarWidget extends ConsumerWidget {
     final activeRequest = ref.watch(activeRequestProvider);
     final isActive = activeRequest?.id == request.id;
 
-    return ListTile(
-      dense: true,
-      selected: isActive,
-      selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2),
-      contentPadding: const EdgeInsets.only(left: 32, right: 16),
-      title: Text(
-        request.name,
-        style: TextStyle(
-          fontSize: 13,
-          color: isActive ? Theme.of(context).colorScheme.primary : null,
+    return Container(
+      decoration: BoxDecoration(
+        color: isActive ? Theme.of(context).colorScheme.primary.withOpacity(0.15) : Colors.transparent,
+        border: Border(
+          left: BorderSide(
+            color: isActive ? Theme.of(context).colorScheme.primary : Colors.transparent,
+            width: 3,
+          ),
         ),
       ),
-      subtitle: Text(
-        request.method,
-        style: TextStyle(
-          fontSize: 10,
-          color: _getMethodColor(request.method),
-          fontWeight: FontWeight.bold,
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.only(left: 28, right: 16),
+        visualDensity: const VisualDensity(vertical: -2),
+        title: Text(
+          request.name,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+            color: isActive ? Colors.white : Colors.white70,
+          ),
         ),
+        subtitle: Text(
+          request.method,
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            color: HttpColors.getMethodColor(request.method),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        onTap: () {
+          ref.read(openRequestsProvider.notifier).openRequest(request);
+        },
       ),
-      onTap: () {
-        ref.read(activeRequestProvider.notifier).state = request;
-      },
     );
-  }
-
-  Color _getMethodColor(String method) {
-    switch (method.toUpperCase()) {
-      case 'GET':
-        return Colors.green;
-      case 'POST':
-        return Colors.orange;
-      case 'PUT':
-        return Colors.blue;
-      case 'DELETE':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
   }
 
   Future<void> _showCreateCollectionDialog(

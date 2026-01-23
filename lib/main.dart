@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:window_manager/window_manager.dart';
 import 'features/home/presentation/sidebar_widget.dart';
+import 'features/home/presentation/request_tabs_widget.dart';
 import 'features/request/presentation/request_editor_widget.dart';
 
 void main() async {
@@ -84,7 +85,12 @@ class EchoHome extends StatelessWidget {
           ),
           // Área Principal
           const Expanded(
-            child: RequestEditorWidget(),
+            child: Column(
+              children: [
+                RequestTabsWidget(),
+                Expanded(child: RequestEditorWidget()),
+              ],
+            ),
           ),
         ],
       ),
