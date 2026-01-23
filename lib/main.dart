@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:window_manager/window_manager.dart';
+import 'features/home/presentation/sidebar_widget.dart';
+import 'features/request/presentation/request_editor_widget.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -74,65 +76,15 @@ class EchoHome extends StatelessWidget {
       body: Row(
         children: [
           // Sidebar
+          const SidebarWidget(),
+          // Separator
           Container(
-            width: 250,
-            // Borda sutil à direita para separar do conteúdo
-            decoration: const BoxDecoration(
-                color: Color(0xFF252526), // Um tom levemente diferente para contraste
-                border: Border(right: BorderSide(color: Colors.white10))
-            ),
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                _buildSidebarItem(Icons.flash_on, 'New Request', true),
-                _buildSidebarItem(Icons.folder_open, 'Collections', false),
-                _buildSidebarItem(Icons.history, 'History', false),
-              ],
-            ),
+            width: 1,
+            color: Colors.white10,
           ),
           // Área Principal
-          Expanded(
-            child: Container(
-              color: const Color(0xFF1E1E1E),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.bolt, size: 64, color: Colors.white10),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Select a request to start',
-                      style: GoogleFonts.inter(color: Colors.white38),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(IconData icon, String label, bool isActive) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        color: isActive ? const Color(0xFF6C63FF).withOpacity(0.15) : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: isActive ? const Color(0xFF6C63FF) : Colors.white54),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: TextStyle(
-              color: isActive ? const Color(0xFFFFFFFF) : Colors.white54,
-              fontSize: 13,
-              fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
-            ),
+          const Expanded(
+            child: RequestEditorWidget(),
           ),
         ],
       ),
