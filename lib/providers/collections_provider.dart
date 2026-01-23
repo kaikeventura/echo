@@ -51,6 +51,13 @@ class Collections extends _$Collections {
     }
   }
 
+  Future<void> updateRequest(RequestModel request) async {
+    await _isar.writeTxn(() async {
+      await _isar.requestModels.put(request);
+    });
+    state = AsyncValue.data(await _fetchCollections());
+  }
+
   Future<void> deleteRequest(Id requestId) async {
     await _isar.writeTxn(() async {
       await _isar.requestModels.delete(requestId);
