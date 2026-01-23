@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:window_manager/window_manager.dart';
 import 'features/home/presentation/sidebar_widget.dart';
 import 'features/home/presentation/request_tabs_widget.dart';
+import 'features/home/presentation/splash_screen.dart';
 import 'features/request/presentation/request_editor_widget.dart';
 
 void main() async {
@@ -51,7 +52,7 @@ class EchoApp extends StatelessWidget {
           background: Color(0xFF1E1E1E),
         ),
       ),
-      home: const EchoHome(),
+      home: const SplashScreen(), // Inicia pela Splash Screen
     );
   }
 }
