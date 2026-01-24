@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../models/request_model.dart';
 import '../../../providers/active_request_provider.dart';
 import '../../../providers/collections_provider.dart';
+import '../../../providers/request_execution_provider.dart';
 import '../../../utils/http_colors.dart';
 import '../../../widgets/key_value_table.dart';
 
@@ -178,7 +179,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             height: 48,
             child: ElevatedButton.icon(
               onPressed: () {
-                // ref.read(requestExecutionProvider.notifier).execute();
+                ref.read(requestExecutionProvider.notifier).execute();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
