@@ -8,6 +8,7 @@ import '../../../providers/active_request_provider.dart';
 import '../../../providers/collections_provider.dart';
 import '../../../providers/open_requests_provider.dart';
 import '../../../utils/http_colors.dart';
+import '../../../widgets/key_value_table.dart';
 
 // Helper class to carry drag data
 class RequestDragData {
@@ -134,9 +135,16 @@ class SidebarWidget extends ConsumerWidget {
           _showRenameCollectionDialog(context, ref, collection);
         } else if (value == 'delete') {
           _showDeleteCollectionDialog(context, ref, collection);
+        } else if (value == 'environment') {
+          _showEnvironmentDialog(context, ref, collection);
         }
       },
       itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'environment',
+          height: 32,
+          child: Text('Environment', style: TextStyle(fontSize: 13)),
+        ),
         const PopupMenuItem(
           value: 'rename',
           height: 32,
@@ -247,6 +255,61 @@ class SidebarWidget extends ConsumerWidget {
   }
 
   // --- Dialogs ---
+
+  Future<void> _showEnvironmentDialog(
+      BuildContext context, WidgetRef ref, CollectionModel collection) async {
+    final envMap = <String, String>{};
+    if (collection.environment != null) {
+      for (var v in collection.environment!) {
+        if (v.key != null && v.key!.isNotEmpty) {
+          envMap[v.key!] = v.value ?? '';
+        }
+      }
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Environment: ${collection.name}'),
+        content: SizedBox(
+          width: 500,
+          height: 400,
+          child: KeyValueTable(
+            items: envMap,
+            onChanged: (key, value, oldKey) {
+              final newEnv = collection.environment != null
+                  ? List<EnvironmentVariable>.from(collection.environment!)
+                  : <EnvironmentVariable>[];
+              
+              if (oldKey.isEmpty) {
+                newEnv.add(EnvironmentVariable()..key = key..value = value);
+              } else {
+                final index = newEnv.indexWhere((v) => v.key == oldKey);
+                if (index != -1) {
+                  newEnv[index].key = key;
+                  newEnv[index].value = value;
+                } else {
+                  newEnv.add(EnvironmentVariable()..key = key..value = value);
+                }
+              }
+              ref.read(collectionsProvider.notifier).updateEnvironment(collection.id, newEnv);
+            },
+            onDeleted: (key) {
+              final newEnv = List<EnvironmentVariable>.from(collection.environment!);
+              newEnv.removeWhere((v) => v.key == key);
+              ref.read(collectionsProvider.notifier).updateEnvironment(collection.id, newEnv);
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _showCreateCollectionDialog(
       BuildContext context, WidgetRef ref) async {

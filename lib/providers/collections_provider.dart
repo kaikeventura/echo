@@ -41,6 +41,17 @@ class Collections extends _$Collections {
     }
   }
 
+  Future<void> updateEnvironment(Id collectionId, List<EnvironmentVariable> environment) async {
+    final collection = await _isar.collectionModels.get(collectionId);
+    if (collection != null) {
+      collection.environment = environment;
+      await _isar.writeTxn(() async {
+        await _isar.collectionModels.put(collection);
+      });
+      state = AsyncValue.data(await _fetchCollections());
+    }
+  }
+
   Future<void> deleteCollection(Id id) async {
     // Also delete all requests inside the collection to avoid orphans
     final collection = await _isar.collectionModels.get(id);

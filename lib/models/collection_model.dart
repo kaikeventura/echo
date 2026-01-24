@@ -10,4 +10,12 @@ class CollectionModel {
   late String name;
 
   final requests = IsarLinks<RequestModel>();
+
+  List<EnvironmentVariable>? environment;
+}
+
+@embedded
+class EnvironmentVariable {
+  String? key;
+  String? value;
 }
