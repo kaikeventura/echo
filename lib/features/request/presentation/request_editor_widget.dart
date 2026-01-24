@@ -709,6 +709,11 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
                   ),
                 ),
                 IconButton(
+                  icon: const Icon(Icons.edit_note),
+                  tooltip: 'Bulk Edit',
+                  onPressed: activeProfile == null ? null : () => _showBulkEditDialog(activeProfile),
+                ),
+                IconButton(
                   icon: const Icon(Icons.add),
                   tooltip: 'New Environment',
                   onPressed: () => _addNewProfile(collection.id),
@@ -795,6 +800,56 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
 
     if (newName != null && newName.isNotEmpty && mounted) {
       await ref.read(collectionsProvider.notifier).addEnvironmentProfile(collectionId, newName);
+    }
+  }
+
+  Future<void> _showBulkEditDialog(EnvironmentProfile profile) async {
+    final currentVars = profile.variables ?? [];
+    final text = currentVars.map((v) => '${v.key}:${v.value}').join('\n');
+    final controller = TextEditingController(text: text);
+
+    final newText = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Bulk Edit: ${profile.name}'),
+        content: SizedBox(
+          width: 500,
+          child: TextField(
+            controller: controller,
+            maxLines: 15,
+            autofocus: true,
+            style: GoogleFonts.jetBrainsMono(fontSize: 13),
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'KEY:VALUE\nANOTHER_KEY:ANOTHER_VALUE',
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (newText != null && mounted) {
+      final newVars = <EnvironmentVariable>[];
+      final lines = newText.split('\n');
+      for (var line in lines) {
+        if (line.trim().isEmpty) continue;
+        final parts = line.split(':');
+        if (parts.length >= 2) {
+          final key = parts.first.trim();
+          final value = parts.sublist(1).join(':').trim();
+          if (key.isNotEmpty) {
+            newVars.add(EnvironmentVariable()..key = key..value = value);
+          }
+        }
+      }
+      await ref.read(collectionsProvider.notifier).updateEnvironmentVariables(profile.id, newVars);
     }
   }
 }
