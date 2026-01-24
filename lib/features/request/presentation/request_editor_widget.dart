@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:isar/isar.dart';
+import 'package:code_text_field/code_text_field.dart';
+import 'package:flutter_highlight/themes/github-dark.dart';
 import '../../../models/collection_model.dart';
 import '../../../models/environment_profile_model.dart';
 import '../../../models/request_model.dart';
@@ -22,8 +24,8 @@ class RequestEditorWidget extends ConsumerStatefulWidget {
 class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  late TextEditingController _urlController;
-  late TextEditingController _bodyController;
+  CodeController? _urlController;
+  CodeController? _bodyController;
 
   // Estado de validação
   String? _bodyError;
@@ -40,16 +42,69 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _urlController = TextEditingController();
-    _bodyController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateCodeControllers();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _urlController.dispose();
-    _bodyController.dispose();
+    _urlController?.dispose();
+    _bodyController?.dispose();
     super.dispose();
+  }
+
+  void _updateCodeControllers() {
+    final activeRequest = ref.read(activeRequestProvider);
+    if (activeRequest == null) return;
+
+    final collections = ref.read(collectionsProvider).valueOrNull ?? [];
+    final parentCollection = collections.firstWhere(
+      (c) => c.requests.any((r) => r.id == activeRequest.id),
+      orElse: () => CollectionModel(),
+    );
+
+    List<String> envKeys = [];
+    if (parentCollection.id != 0) {
+      parentCollection.activeEnvironment.loadSync();
+      final activeProfile = parentCollection.activeEnvironment.value;
+      if (activeProfile != null) {
+        activeProfile.variables?.forEach((v) {
+          if (v.key != null) envKeys.add(v.key!);
+        });
+      }
+    }
+    
+    // Dispose old controllers if they exist
+    _urlController?.dispose();
+    _bodyController?.dispose();
+
+    _urlController = _createCodeController(activeRequest.url, envKeys);
+    _bodyController = _createCodeController(activeRequest.body ?? '', envKeys);
+  }
+
+  CodeController _createCodeController(String text, List<String> envKeys) {
+    final language = _createCustomLanguage(envKeys);
+    return CodeController(
+      text: text,
+      language: language,
+      patternMap: {
+        r'\{\{([a-zA-Z0-9_]+)\}\}': const TextStyle(color: Colors.orange),
+      },
+    );
+  }
+
+  // This is a simplified custom language definition
+  Map<String, TextStyle> _createCustomLanguage(List<String> envKeys) {
+    final Map<String, TextStyle> theme = {};
+    for (var key in envKeys) {
+      theme['{{$key}}'] = const TextStyle(color: Colors.green);
+    }
+    return theme;
   }
 
   @override
@@ -72,15 +127,14 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       );
     }
 
-    // Update controllers if request changed
-    if (_urlController.text != activeRequest.url) {
-      _urlController.text = activeRequest.url;
+    // Update controllers if request or environment changed
+    // This is tricky, so we'll rely on didChangeDependencies and state management
+    // For now, let's just update text if it's different
+    if (_urlController?.text != activeRequest.url) {
+      _urlController?.text = activeRequest.url;
     }
-    // Only update body controller if it's different to avoid cursor jumping
-    if (_bodyController.text != (activeRequest.body ?? '')) {
-      _bodyController.text = activeRequest.body ?? '';
-      // Re-validate on load
-      _validateBody(activeRequest.body ?? '', _getCurrentContentType(activeRequest));
+    if (_bodyController?.text != (activeRequest.body ?? '')) {
+      _bodyController?.text = activeRequest.body ?? '';
     }
 
     return Column(
@@ -193,21 +247,9 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: TextField(
-              controller: _urlController,
-              style: GoogleFonts.inter(fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'https://api.example.com/v1/users',
-                hintStyle: GoogleFonts.inter(color: Colors.white24),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                prefixIcon: const Icon(Icons.link, color: Colors.white24, size: 18),
-              ),
+            child: CodeField(
+              controller: _urlController!,
+              textStyle: GoogleFonts.inter(fontSize: 14),
               onChanged: (val) {
                 request.url = val;
                 _saveRequest(request);
@@ -499,36 +541,9 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: TextField(
-        controller: _bodyController,
-        maxLines: null,
-        expands: true,
-        textAlignVertical: TextAlignVertical.top,
-        style: GoogleFonts.jetBrainsMono(fontSize: 13, height: 1.5),
-        decoration: InputDecoration(
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Colors.white10),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-              color: _bodyError != null ? Colors.red.withOpacity(0.5) : Colors.white10
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-              color: _bodyError != null 
-                  ? Colors.redAccent 
-                  : Theme.of(context).colorScheme.primary.withOpacity(0.5)
-            ),
-          ),
-          filled: true,
-          fillColor: const Color(0xFF1E1E1E),
-          hintText: hint,
-          hintStyle: GoogleFonts.jetBrainsMono(color: Colors.white24),
-        ),
+      child: CodeField(
+        controller: _bodyController!,
+        textStyle: GoogleFonts.jetBrainsMono(fontSize: 13, height: 1.5),
         onChanged: (val) {
           request.body = val;
           _validateBody(val, type);
@@ -571,7 +586,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
         newHeaders.removeAt(index);
       }
       request.body = ''; // Clear body if No Body selected
-      _bodyController.clear();
+      _bodyController?.clear();
       _bodyError = null;
     } else {
       if (index != -1) {
@@ -611,7 +626,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   void _prettifyBody(RequestModel request, String type) {
-    final text = _bodyController.text;
+    final text = _bodyController?.text ?? '';
     if (text.isEmpty) return;
 
     String formatted = text;
@@ -623,7 +638,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     if (formatted != text) {
       request.body = formatted;
-      _bodyController.text = formatted;
+      _bodyController?.text = formatted;
       _saveRequest(request);
       _validateBody(formatted, type);
     }
