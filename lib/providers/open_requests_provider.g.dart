@@ -6,7 +6,7 @@ part of 'open_requests_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$openRequestsHash() => r'33bd23d19848626dddb7a420fc26ccf5ff8c7d62';
+String _$openRequestsHash() => r'315d0f032c30e7222fc18b5332914a3084b5a5f6';
 
 /// See also [OpenRequests].
 @ProviderFor(OpenRequests)

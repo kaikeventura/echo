@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:multi_split_view/multi_split_view.dart';
 import 'package:window_manager/window_manager.dart';
 import 'features/home/presentation/sidebar_widget.dart';
 import 'features/home/presentation/request_tabs_widget.dart';
 import 'features/home/presentation/splash_screen.dart';
 import 'features/request/presentation/request_editor_widget.dart';
+import 'features/request/presentation/response_panel_widget.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +64,22 @@ class EchoHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Controlador para o divisor principal (vertical)
+    final mainSplitController = MultiSplitViewController(
+      areas: [
+        Area(size: 250, min: 200), // Sidebar
+        Area(min: 400), // Conteúdo Principal
+      ],
+    );
+
+    // Controlador para o divisor de conteúdo (horizontal)
+    final contentSplitController = MultiSplitViewController(
+      areas: [
+        Area(weight: 0.6, min: 300), // Editor de Requisição
+        Area(weight: 0.4, min: 200), // Painel de Resposta
+      ],
+    );
+
     return Scaffold(
       // Topbar customizada que permite arrastar a janela
       appBar: PreferredSize(
@@ -75,25 +93,37 @@ class EchoHome extends StatelessWidget {
           ),
         ),
       ),
-      body: Row(
-        children: [
-          // Sidebar
-          const SidebarWidget(),
-          // Separator
-          Container(
-            width: 1,
-            color: Colors.white10,
+      body: MultiSplitViewTheme(
+        data: MultiSplitViewThemeData(
+          dividerThickness: 6,
+          dividerColor: Theme.of(context).colorScheme.background,
+          dividerPainter: DividerPainters.grooved1(
+            color: Theme.of(context).colorScheme.surface,
+            highlightedColor: Theme.of(context).colorScheme.primary,
           ),
-          // Área Principal
-          const Expanded(
-            child: Column(
+        ),
+        child: MultiSplitView(
+          axis: Axis.horizontal,
+          controller: mainSplitController,
+          children: [
+            const SidebarWidget(),
+            Column(
               children: [
-                RequestTabsWidget(),
-                Expanded(child: RequestEditorWidget()),
+                const RequestTabsWidget(),
+                Expanded(
+                  child: MultiSplitView(
+                    axis: Axis.vertical,
+                    controller: contentSplitController,
+                    children: const [
+                      RequestEditorWidget(),
+                      ResponsePanelWidget(),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

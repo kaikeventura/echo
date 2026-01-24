@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../models/request_model.dart';
 import '../../../providers/active_request_provider.dart';
-import '../../../providers/request_execution_provider.dart';
 import '../../../providers/collections_provider.dart';
 import '../../../utils/http_colors.dart';
 import '../../../widgets/key_value_table.dart';
@@ -110,11 +109,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             ],
           ),
         ),
-        Container(
-          height: 1,
-          color: Colors.white10,
-        ),
-        _buildResponsePanel(ref),
       ],
     );
   }
@@ -184,7 +178,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             height: 48,
             child: ElevatedButton.icon(
               onPressed: () {
-                ref.read(requestExecutionProvider.notifier).execute();
+                // ref.read(requestExecutionProvider.notifier).execute();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
@@ -478,109 +472,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           _saveRequest(request);
         },
       ),
-    );
-  }
-
-  Widget _buildResponsePanel(WidgetRef ref) {
-    final executionState = ref.watch(requestExecutionProvider);
-
-    return SizedBox(
-      height: 300,
-      child: executionState.when(
-        data: (response) {
-          if (response == null) {
-            return Center(
-              child: Text(
-                'Ready to send request',
-                style: GoogleFonts.inter(color: Colors.white24),
-              ),
-            );
-          }
-
-          // Try to format body if it's JSON
-          String displayBody = response.body.toString();
-          displayBody = _tryFormatJson(displayBody);
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                color: const Color(0xFF252526),
-                child: Row(
-                  children: [
-                    _buildStatusBadge(response.statusCode),
-                    const SizedBox(width: 24),
-                    _buildMetric(Icons.timer_outlined, '${response.executionTimeMs}ms'),
-                    const SizedBox(width: 24),
-                    _buildMetric(Icons.data_usage, '${response.responseSizeBytes} B'),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  color: const Color(0xFF1E1E1E),
-                  child: SingleChildScrollView(
-                    child: SelectableText(
-                      displayBody,
-                      style: GoogleFonts.jetBrainsMono(fontSize: 12, height: 1.5),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red))),
-      ),
-    );
-  }
-
-  Widget _buildStatusBadge(int statusCode) {
-    final color = HttpColors.getStatusCodeColor(statusCode);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '$statusCode',
-            style: GoogleFonts.inter(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetric(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: Colors.white54),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: GoogleFonts.inter(color: Colors.white70, fontSize: 12),
-        ),
-      ],
     );
   }
 
