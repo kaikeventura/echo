@@ -33,14 +33,6 @@ class OpenRequests extends _$OpenRequests {
           .where((r) => r.id == session.activeRequestId)
           .firstOrNull;
       
-      // We need to delay this slightly or use a listener because we are in build
-      // But since this is async build, we can just set it after this returns?
-      // No, we can't modify other providers inside build.
-      // We will use a side effect in the UI or a listener.
-      // Actually, we can just set it here if we are careful, but better to let the UI handle it
-      // or use a separate logic.
-      
-      // However, for simplicity in this architecture:
       Future.microtask(() {
         ref.read(activeRequestProvider.notifier).state = activeRequest;
       });
@@ -97,10 +89,53 @@ class OpenRequests extends _$OpenRequests {
     await _saveSession(newList, newActive?.id);
   }
   
-  // Call this when active request changes manually (e.g. clicking a tab)
   Future<void> setActive(RequestModel request) async {
     ref.read(activeRequestProvider.notifier).state = request;
     final currentList = state.value ?? [];
     await _saveSession(currentList, request.id);
+  }
+
+  Future<void> closeAll() async {
+    state = const AsyncValue.data([]);
+    ref.read(activeRequestProvider.notifier).state = null;
+    await _saveSession([], null);
+  }
+
+  Future<void> closeTabsToLeft(RequestModel request) async {
+    final currentList = state.value ?? [];
+    final index = currentList.indexWhere((r) => r.id == request.id);
+    if (index <= 0) return;
+
+    final newList = currentList.sublist(index);
+    state = AsyncValue.data(newList);
+    
+    // Check if active request was closed
+    final activeRequest = ref.read(activeRequestProvider);
+    final activeStillOpen = newList.any((r) => r.id == activeRequest?.id);
+    
+    if (!activeStillOpen) {
+      ref.read(activeRequestProvider.notifier).state = request;
+    }
+
+    await _saveSession(newList, ref.read(activeRequestProvider)?.id);
+  }
+
+  Future<void> closeTabsToRight(RequestModel request) async {
+    final currentList = state.value ?? [];
+    final index = currentList.indexWhere((r) => r.id == request.id);
+    if (index == -1 || index == currentList.length - 1) return;
+
+    final newList = currentList.sublist(0, index + 1);
+    state = AsyncValue.data(newList);
+
+    // Check if active request was closed
+    final activeRequest = ref.read(activeRequestProvider);
+    final activeStillOpen = newList.any((r) => r.id == activeRequest?.id);
+    
+    if (!activeStillOpen) {
+      ref.read(activeRequestProvider.notifier).state = request;
+    }
+
+    await _saveSession(newList, ref.read(activeRequestProvider)?.id);
   }
 }

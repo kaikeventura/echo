@@ -43,11 +43,58 @@ class RequestTabsWidget extends ConsumerWidget {
     );
   }
 
+  void _showContextMenu(BuildContext context, WidgetRef ref, RequestModel request, Offset tapPosition) {
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    
+    showMenu(
+      context: context,
+      position: RelativeRect.fromRect(
+        tapPosition & const Size(40, 40), // and size of the tap area
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        const PopupMenuItem(
+          value: 'close_all',
+          height: 32,
+          child: Text('Close All Tabs', style: TextStyle(fontSize: 13)),
+        ),
+        const PopupMenuItem(
+          value: 'close_left',
+          height: 32,
+          child: Text('Close Tabs to the Left', style: TextStyle(fontSize: 13)),
+        ),
+        const PopupMenuItem(
+          value: 'close_right',
+          height: 32,
+          child: Text('Close Tabs to the Right', style: TextStyle(fontSize: 13)),
+        ),
+      ],
+    ).then((value) {
+      if (value == null) return;
+      
+      final notifier = ref.read(openRequestsProvider.notifier);
+      switch (value) {
+        case 'close_all':
+          notifier.closeAll();
+          break;
+        case 'close_left':
+          notifier.closeTabsToLeft(request);
+          break;
+        case 'close_right':
+          notifier.closeTabsToRight(request);
+          break;
+      }
+    });
+  }
+
   Widget _buildTab(
       BuildContext context, WidgetRef ref, RequestModel request, bool isActive) {
-    return InkWell(
+    return GestureDetector(
       onTap: () {
         ref.read(openRequestsProvider.notifier).setActive(request);
+      },
+      onSecondaryTapDown: (details) {
+        _showContextMenu(context, ref, request, details.globalPosition);
       },
       child: Container(
         width: 180,
