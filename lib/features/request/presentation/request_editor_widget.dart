@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../models/collection_model.dart';
 import '../../../models/request_model.dart';
 import '../../../providers/active_request_provider.dart';
 import '../../../providers/collections_provider.dart';
@@ -175,6 +176,12 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             ),
           ),
           const SizedBox(width: 16),
+          IconButton(
+            icon: const Icon(Icons.code, color: Colors.white54),
+            tooltip: 'Collection Environment',
+            onPressed: () => _showEnvironmentDialog(context, ref),
+          ),
+          const SizedBox(width: 8),
           SizedBox(
             height: 48,
             child: ElevatedButton.icon(
@@ -616,5 +623,70 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     } catch (e) {
       return text;
     }
+  }
+
+  Future<void> _showEnvironmentDialog(BuildContext context, WidgetRef ref) async {
+    final activeRequest = ref.read(activeRequestProvider);
+    if (activeRequest == null) return;
+
+    final collections = ref.read(collectionsProvider).valueOrNull ?? [];
+    final parentCollection = collections.firstWhere(
+      (c) => c.requests.any((r) => r.id == activeRequest.id),
+      orElse: () => CollectionModel(),
+    );
+
+    if (parentCollection.id == 0) return; // Not found
+
+    final envMap = <String, String>{};
+    if (parentCollection.environment != null) {
+      for (var v in parentCollection.environment!) {
+        if (v.key != null && v.key!.isNotEmpty) {
+          envMap[v.key!] = v.value ?? '';
+        }
+      }
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Environment: ${parentCollection.name}'),
+        content: SizedBox(
+          width: 500,
+          height: 400,
+          child: KeyValueTable(
+            items: envMap,
+            onChanged: (key, value, oldKey) {
+              final newEnv = parentCollection.environment != null
+                  ? List<EnvironmentVariable>.from(parentCollection.environment!)
+                  : <EnvironmentVariable>[];
+              
+              if (oldKey.isEmpty) {
+                newEnv.add(EnvironmentVariable()..key = key..value = value);
+              } else {
+                final index = newEnv.indexWhere((v) => v.key == oldKey);
+                if (index != -1) {
+                  newEnv[index].key = key;
+                  newEnv[index].value = value;
+                } else {
+                  newEnv.add(EnvironmentVariable()..key = key..value = value);
+                }
+              }
+              ref.read(collectionsProvider.notifier).updateEnvironment(parentCollection.id, newEnv);
+            },
+            onDeleted: (key) {
+              final newEnv = List<EnvironmentVariable>.from(parentCollection.environment!);
+              newEnv.removeWhere((v) => v.key == key);
+              ref.read(collectionsProvider.notifier).updateEnvironment(parentCollection.id, newEnv);
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 }
