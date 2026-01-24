@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -47,12 +48,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   @override
-  void didUpdateWidget(covariant RequestEditorWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // This is a good place to react to changes from parent, but we use Riverpod
-  }
-
-  @override
   void dispose() {
     _tabController.dispose();
     _urlController?.dispose();
@@ -87,18 +82,18 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   CodeController _createCodeController(String text, List<String> envKeys) {
-    // Pattern for valid variables
-    final validKeysPattern = envKeys.isNotEmpty ? r'\{\{(' + envKeys.join('|') + r')\}\}' : null;
-    
-    final patternMap = {
-      // General pattern for any {{...}}
-      r'\{\{([a-zA-Z0-9_]+)\}\}': const TextStyle(color: Colors.orange),
-    };
+    final patternMap = LinkedHashMap<String, TextStyle>();
 
-    if (validKeysPattern != null) {
-      // Add the specific pattern for valid keys first, so it takes precedence
+    // Pattern for valid variables (green)
+    if (envKeys.isNotEmpty) {
+      // Escape special characters in keys for regex
+      final escapedKeys = envKeys.map((k) => RegExp.escape(k)).toList();
+      final validKeysPattern = r'\{\{(' + escapedKeys.join('|') + r')\}\}';
       patternMap[validKeysPattern] = const TextStyle(color: Colors.green);
     }
+
+    // General pattern for any other {{...}} (red)
+    patternMap[r'\{\{([a-zA-Z0-9_]+)\}\}'] = const TextStyle(color: Colors.redAccent);
 
     return CodeController(
       text: text,
@@ -127,7 +122,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     }
 
     // When active request changes, we need to rebuild the controllers
-    // We use a listener to avoid doing this during build
     ref.listen(activeRequestProvider, (previous, next) {
       if (previous?.id != next?.id) {
         setState(() {

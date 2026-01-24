@@ -26,7 +26,6 @@ dependencies:
   flutter_acrylic: ^1.1.4
   google_fonts: ^6.2.1
   multi_split_view: ^2.2.0
-  # CORREÇÃO AQUI: Downgrade para versão estável
   code_text_field: ^1.1.0
 
   # Utilities
