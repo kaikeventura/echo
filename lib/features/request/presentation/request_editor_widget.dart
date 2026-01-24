@@ -144,6 +144,18 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
   Widget _buildTopBar(
       BuildContext context, WidgetRef ref, RequestModel request) {
+    
+    final collections = ref.watch(collectionsProvider).valueOrNull ?? [];
+    final parentCollection = collections.firstWhere(
+      (c) => c.requests.any((r) => r.id == request.id),
+      orElse: () => CollectionModel(),
+    );
+    
+    if (parentCollection.id != 0) {
+      parentCollection.activeEnvironment.loadSync();
+    }
+    final activeProfile = parentCollection.activeEnvironment.value;
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
@@ -203,6 +215,22 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             ),
           ),
           const SizedBox(width: 16),
+          if (activeProfile != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                activeProfile.name,
+                style: GoogleFonts.inter(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.code, color: Colors.white54),
             tooltip: 'Collection Environment',
