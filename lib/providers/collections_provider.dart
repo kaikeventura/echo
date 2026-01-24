@@ -117,48 +117,50 @@ class Collections extends _$Collections {
   // --- Environment Methods ---
 
   Future<void> addEnvironmentProfile(Id collectionId, String name) async {
-    final collection = await _isar.collectionModels.get(collectionId);
-    if (collection != null) {
-      final newProfile = EnvironmentProfile()..name = name;
-      await _isar.writeTxn(() async {
+    await _isar.writeTxn(() async {
+      final collection = await _isar.collectionModels.get(collectionId);
+      if (collection != null) {
+        final newProfile = EnvironmentProfile()..name = name;
         await _isar.environmentProfiles.put(newProfile);
+        
+        await collection.environmentProfiles.load();
         collection.environmentProfiles.add(newProfile);
         await collection.environmentProfiles.save();
-        // If it's the first one, set it as active
+        
+        await collection.activeEnvironment.load();
         if (collection.activeEnvironment.value == null) {
           collection.activeEnvironment.value = newProfile;
           await collection.activeEnvironment.save();
         }
-      });
-      state = AsyncValue.data(await _fetchCollections());
-    }
+      }
+    });
+    state = AsyncValue.data(await _fetchCollections());
   }
 
   Future<void> updateEnvironmentVariables(Id profileId, List<EnvironmentVariable> variables) async {
-    final profile = await _isar.environmentProfiles.get(profileId);
-    if (profile != null) {
-      profile.variables = variables;
-      await _isar.writeTxn(() async {
+    await _isar.writeTxn(() async {
+      final profile = await _isar.environmentProfiles.get(profileId);
+      if (profile != null) {
+        profile.variables = variables;
         await _isar.environmentProfiles.put(profile);
-      });
-      // No need to refetch all collections, but for simplicity we do
-      state = AsyncValue.data(await _fetchCollections());
-    }
+      }
+    });
+    state = AsyncValue.data(await _fetchCollections());
   }
 
   Future<void> setActiveEnvironment(Id collectionId, Id? profileId) async {
-    final collection = await _isar.collectionModels.get(collectionId);
-    if (collection != null) {
-      if (profileId == null) {
-        collection.activeEnvironment.value = null;
-      } else {
-        final profile = await _isar.environmentProfiles.get(profileId);
-        collection.activeEnvironment.value = profile;
-      }
-      await _isar.writeTxn(() async {
+    await _isar.writeTxn(() async {
+      final collection = await _isar.collectionModels.get(collectionId);
+      if (collection != null) {
+        if (profileId == null) {
+          collection.activeEnvironment.value = null;
+        } else {
+          final profile = await _isar.environmentProfiles.get(profileId);
+          collection.activeEnvironment.value = profile;
+        }
         await collection.activeEnvironment.save();
-      });
-      state = AsyncValue.data(await _fetchCollections());
-    }
+      }
+    });
+    state = AsyncValue.data(await _fetchCollections());
   }
 }
