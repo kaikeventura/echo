@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:isar/isar.dart';
 import 'package:code_text_field/code_text_field.dart';
-import 'package:flutter_highlight/themes/github-dark.dart';
 import '../../../models/collection_model.dart';
 import '../../../models/environment_profile_model.dart';
 import '../../../models/request_model.dart';
@@ -42,12 +41,15 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // Initialize with empty controllers to prevent null errors
+    _urlController = _createCodeController('', []);
+    _bodyController = _createCodeController('', []);
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _updateCodeControllers();
+  void didUpdateWidget(covariant RequestEditorWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // This is a good place to react to changes from parent, but we use Riverpod
   }
 
   @override
@@ -58,10 +60,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     super.dispose();
   }
 
-  void _updateCodeControllers() {
-    final activeRequest = ref.read(activeRequestProvider);
-    if (activeRequest == null) return;
-
+  void _updateCodeControllers(RequestModel activeRequest) {
     final collections = ref.read(collectionsProvider).valueOrNull ?? [];
     final parentCollection = collections.firstWhere(
       (c) => c.requests.any((r) => r.id == activeRequest.id),
@@ -79,7 +78,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       }
     }
     
-    // Dispose old controllers if they exist
+    // Dispose old controllers and create new ones
     _urlController?.dispose();
     _bodyController?.dispose();
 
@@ -88,23 +87,23 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   CodeController _createCodeController(String text, List<String> envKeys) {
-    final language = _createCustomLanguage(envKeys);
+    // Pattern for valid variables
+    final validKeysPattern = envKeys.isNotEmpty ? r'\{\{(' + envKeys.join('|') + r')\}\}' : null;
+    
+    final patternMap = {
+      // General pattern for any {{...}}
+      r'\{\{([a-zA-Z0-9_]+)\}\}': const TextStyle(color: Colors.orange),
+    };
+
+    if (validKeysPattern != null) {
+      // Add the specific pattern for valid keys first, so it takes precedence
+      patternMap[validKeysPattern] = const TextStyle(color: Colors.green);
+    }
+
     return CodeController(
       text: text,
-      language: language,
-      patternMap: {
-        r'\{\{([a-zA-Z0-9_]+)\}\}': const TextStyle(color: Colors.orange),
-      },
+      patternMap: patternMap,
     );
-  }
-
-  // This is a simplified custom language definition
-  Map<String, TextStyle> _createCustomLanguage(List<String> envKeys) {
-    final Map<String, TextStyle> theme = {};
-    for (var key in envKeys) {
-      theme['{{$key}}'] = const TextStyle(color: Colors.green);
-    }
-    return theme;
   }
 
   @override
@@ -127,9 +126,17 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       );
     }
 
-    // Update controllers if request or environment changed
-    // This is tricky, so we'll rely on didChangeDependencies and state management
-    // For now, let's just update text if it's different
+    // When active request changes, we need to rebuild the controllers
+    // We use a listener to avoid doing this during build
+    ref.listen(activeRequestProvider, (previous, next) {
+      if (previous?.id != next?.id) {
+        setState(() {
+          _updateCodeControllers(next!);
+        });
+      }
+    });
+
+    // Update text if it's different (e.g. from bulk edit)
     if (_urlController?.text != activeRequest.url) {
       _urlController?.text = activeRequest.url;
     }
