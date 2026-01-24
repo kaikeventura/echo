@@ -97,10 +97,10 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           indicatorColor: Theme.of(context).colorScheme.primary,
           dividerColor: Colors.transparent,
           labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
-          tabs: const [
-            Tab(text: 'Params'),
-            Tab(text: 'Headers'),
-            Tab(text: 'Body'),
+          tabs: [
+            _buildTabHeader("Params"),
+            _buildTabHeader("Headers"),
+            _buildTabHeader("Body"),
           ],
         ),
         Expanded(
@@ -114,6 +114,31 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTabHeader(String title) {
+    return Tab(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(title),
+          if (title == 'Params' || title == 'Headers') ...[
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.edit_note, size: 16),
+              tooltip: 'Bulk Edit',
+              onPressed: () {
+                if (title == 'Params') {
+                  _showBulkEditDialogForParams(ref.read(activeRequestProvider)!);
+                } else {
+                  _showBulkEditDialogForHeaders(ref.read(activeRequestProvider)!);
+                }
+              },
+            )
+          ]
+        ],
+      ),
     );
   }
 
@@ -644,6 +669,79 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       builder: (context) => EnvironmentDialog(collectionId: parentCollection.id),
     );
   }
+
+  Future<void> _showBulkEditDialogForParams(RequestModel request) async {
+    final uri = Uri.parse(request.url);
+    final text = uri.queryParameters.entries.map((e) => '${e.key}:${e.value}').join('\n');
+    final newText = await _showBulkEditDialog(context, 'Params', text);
+
+    if (newText != null) {
+      final newParams = _parseBulkText(newText);
+      final newUri = uri.replace(queryParameters: newParams);
+      request.url = newUri.toString();
+      _saveRequest(request);
+    }
+  }
+
+  Future<void> _showBulkEditDialogForHeaders(RequestModel request) async {
+    final text = (request.headers ?? []).map((h) => '${h.key}:${h.value}').join('\n');
+    final newText = await _showBulkEditDialog(context, 'Headers', text);
+
+    if (newText != null) {
+      final newHeadersMap = _parseBulkText(newText);
+      request.headers = newHeadersMap.entries
+          .map((e) => RequestHeader()..key = e.key..value = e.value)
+          .toList();
+      _saveRequest(request);
+    }
+  }
+
+  Map<String, String> _parseBulkText(String text) {
+    final map = <String, String>{};
+    final lines = text.split('\n');
+    for (var line in lines) {
+      if (line.trim().isEmpty) continue;
+      final parts = line.split(':');
+      if (parts.length >= 2) {
+        final key = parts.first.trim();
+        final value = parts.sublist(1).join(':').trim();
+        if (key.isNotEmpty) {
+          map[key] = value;
+        }
+      }
+    }
+    return map;
+  }
+
+  Future<String?> _showBulkEditDialog(BuildContext context, String title, String initialText) async {
+    final controller = TextEditingController(text: initialText);
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Bulk Edit: $title'),
+        content: SizedBox(
+          width: 500,
+          child: TextField(
+            controller: controller,
+            maxLines: 15,
+            autofocus: true,
+            style: GoogleFonts.jetBrainsMono(fontSize: 13),
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'KEY:VALUE\nANOTHER_KEY:ANOTHER_VALUE',
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class EnvironmentDialog extends ConsumerStatefulWidget {
@@ -711,7 +809,7 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
                 IconButton(
                   icon: const Icon(Icons.edit_note),
                   tooltip: 'Bulk Edit',
-                  onPressed: activeProfile == null ? null : () => _showBulkEditDialog(activeProfile),
+                  onPressed: activeProfile == null ? null : () => _showBulkEditDialogForEnv(activeProfile),
                 ),
                 IconButton(
                   icon: const Icon(Icons.add),
@@ -803,15 +901,35 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
     }
   }
 
-  Future<void> _showBulkEditDialog(EnvironmentProfile profile) async {
+  Future<void> _showBulkEditDialogForEnv(EnvironmentProfile profile) async {
     final currentVars = profile.variables ?? [];
     final text = currentVars.map((v) => '${v.key}:${v.value}').join('\n');
-    final controller = TextEditingController(text: text);
+    final newText = await _showBulkEditDialog(context, 'Environment: ${profile.name}', text);
 
-    final newText = await showDialog<String>(
+    if (newText != null && mounted) {
+      final newVars = <EnvironmentVariable>[];
+      final lines = newText.split('\n');
+      for (var line in lines) {
+        if (line.trim().isEmpty) continue;
+        final parts = line.split(':');
+        if (parts.length >= 2) {
+          final key = parts.first.trim();
+          final value = parts.sublist(1).join(':').trim();
+          if (key.isNotEmpty) {
+            newVars.add(EnvironmentVariable()..key = key..value = value);
+          }
+        }
+      }
+      await ref.read(collectionsProvider.notifier).updateEnvironmentVariables(profile.id, newVars);
+    }
+  }
+
+  Future<String?> _showBulkEditDialog(BuildContext context, String title, String initialText) async {
+    final controller = TextEditingController(text: initialText);
+    return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Bulk Edit: ${profile.name}'),
+        title: Text('Bulk Edit: $title'),
         content: SizedBox(
           width: 500,
           child: TextField(
@@ -834,22 +952,5 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
         ],
       ),
     );
-
-    if (newText != null && mounted) {
-      final newVars = <EnvironmentVariable>[];
-      final lines = newText.split('\n');
-      for (var line in lines) {
-        if (line.trim().isEmpty) continue;
-        final parts = line.split(':');
-        if (parts.length >= 2) {
-          final key = parts.first.trim();
-          final value = parts.sublist(1).join(':').trim();
-          if (key.isNotEmpty) {
-            newVars.add(EnvironmentVariable()..key = key..value = value);
-          }
-        }
-      }
-      await ref.read(collectionsProvider.notifier).updateEnvironmentVariables(profile.id, newVars);
-    }
   }
 }
