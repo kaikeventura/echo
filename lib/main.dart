@@ -67,16 +67,16 @@ class EchoHome extends StatelessWidget {
     // Controlador para o divisor principal (vertical)
     final mainSplitController = MultiSplitViewController(
       areas: [
-        Area(size: 250, min: 200), // Sidebar
-        Area(min: 400), // Conteúdo Principal
+        Area(size: 250, minimalSize: 200), // Sidebar
+        Area(minimalSize: 400), // Conteúdo Principal
       ],
     );
 
     // Controlador para o divisor de conteúdo (horizontal)
     final contentSplitController = MultiSplitViewController(
       areas: [
-        Area(weight: 0.6, min: 300), // Editor de Requisição
-        Area(weight: 0.4, min: 200), // Painel de Resposta
+        Area(weight: 0.6, minimalSize: 300), // Editor de Requisição
+        Area(weight: 0.4, minimalSize: 200), // Painel de Resposta
       ],
     );
 
@@ -96,7 +96,6 @@ class EchoHome extends StatelessWidget {
       body: MultiSplitViewTheme(
         data: MultiSplitViewThemeData(
           dividerThickness: 6,
-          dividerColor: Theme.of(context).colorScheme.background,
           dividerPainter: DividerPainters.grooved1(
             color: Theme.of(context).colorScheme.surface,
             highlightedColor: Theme.of(context).colorScheme.primary,
