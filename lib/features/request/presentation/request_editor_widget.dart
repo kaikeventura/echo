@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../models/collection_model.dart';
+import '../../../models/environment_profile_model.dart';
 import '../../../models/request_model.dart';
 import '../../../providers/active_request_provider.dart';
 import '../../../providers/collections_provider.dart';
@@ -637,56 +638,162 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     if (parentCollection.id == 0) return; // Not found
 
-    final envMap = <String, String>{};
-    if (parentCollection.environment != null) {
-      for (var v in parentCollection.environment!) {
+    await showDialog(
+      context: context,
+      builder: (context) => EnvironmentDialog(collection: parentCollection),
+    );
+  }
+}
+
+class EnvironmentDialog extends ConsumerStatefulWidget {
+  final CollectionModel collection;
+  const EnvironmentDialog({super.key, required this.collection});
+
+  @override
+  ConsumerState<EnvironmentDialog> createState() => _EnvironmentDialogState();
+}
+
+class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
+  late EnvironmentProfile? selectedProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load profiles and set the active one
+    widget.collection.environmentProfiles.loadSync();
+    widget.collection.activeEnvironment.loadSync();
+    selectedProfile = widget.collection.activeEnvironment.value;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profiles = widget.collection.environmentProfiles;
+
+    return AlertDialog(
+      title: Text('Environment: ${widget.collection.name}'),
+      content: SizedBox(
+        width: 600,
+        height: 450,
+        child: Column(
+          children: [
+            // Toolbar
+            Row(
+              children: [
+                const Text('Active Environment:'),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: DropdownButton<EnvironmentProfile?>(
+                    value: selectedProfile,
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('None'),
+                      ),
+                      ...profiles.map((p) => DropdownMenuItem(
+                            value: p,
+                            child: Text(p.name),
+                          )),
+                    ],
+                    onChanged: (profile) {
+                      ref.read(collectionsProvider.notifier).setActiveEnvironment(widget.collection.id, profile?.id);
+                      setState(() {
+                        selectedProfile = profile;
+                      });
+                    },
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: 'New Environment',
+                  onPressed: _addNewProfile,
+                ),
+              ],
+            ),
+            const Divider(),
+            // Key-Value Editor
+            Expanded(
+              child: selectedProfile == null
+                  ? const Center(child: Text('No environment selected'))
+                  : KeyValueTable(
+                      items: _getVariablesMap(selectedProfile!),
+                      onChanged: (key, value, oldKey) {
+                        final newVars = selectedProfile!.variables != null
+                            ? List<EnvironmentVariable>.from(selectedProfile!.variables!)
+                            : <EnvironmentVariable>[];
+                        
+                        if (oldKey.isEmpty) {
+                          newVars.add(EnvironmentVariable()..key = key..value = value);
+                        } else {
+                          final index = newVars.indexWhere((v) => v.key == oldKey);
+                          if (index != -1) {
+                            newVars[index].key = key;
+                            newVars[index].value = value;
+                          } else {
+                            newVars.add(EnvironmentVariable()..key = key..value = value);
+                          }
+                        }
+                        ref.read(collectionsProvider.notifier).updateEnvironmentVariables(selectedProfile!.id, newVars);
+                      },
+                      onDeleted: (key) {
+                        final newVars = List<EnvironmentVariable>.from(selectedProfile!.variables!);
+                        newVars.removeWhere((v) => v.key == key);
+                        ref.read(collectionsProvider.notifier).updateEnvironmentVariables(selectedProfile!.id, newVars);
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+
+  Map<String, String> _getVariablesMap(EnvironmentProfile profile) {
+    final map = <String, String>{};
+    if (profile.variables != null) {
+      for (var v in profile.variables!) {
         if (v.key != null && v.key!.isNotEmpty) {
-          envMap[v.key!] = v.value ?? '';
+          map[v.key!] = v.value ?? '';
         }
       }
     }
+    return map;
+  }
 
-    await showDialog(
+  Future<void> _addNewProfile() async {
+    final controller = TextEditingController();
+    final newName = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Environment: ${parentCollection.name}'),
-        content: SizedBox(
-          width: 500,
-          height: 400,
-          child: KeyValueTable(
-            items: envMap,
-            onChanged: (key, value, oldKey) {
-              final newEnv = parentCollection.environment != null
-                  ? List<EnvironmentVariable>.from(parentCollection.environment!)
-                  : <EnvironmentVariable>[];
-              
-              if (oldKey.isEmpty) {
-                newEnv.add(EnvironmentVariable()..key = key..value = value);
-              } else {
-                final index = newEnv.indexWhere((v) => v.key == oldKey);
-                if (index != -1) {
-                  newEnv[index].key = key;
-                  newEnv[index].value = value;
-                } else {
-                  newEnv.add(EnvironmentVariable()..key = key..value = value);
-                }
-              }
-              ref.read(collectionsProvider.notifier).updateEnvironment(parentCollection.id, newEnv);
-            },
-            onDeleted: (key) {
-              final newEnv = List<EnvironmentVariable>.from(parentCollection.environment!);
-              newEnv.removeWhere((v) => v.key == key);
-              ref.read(collectionsProvider.notifier).updateEnvironment(parentCollection.id, newEnv);
-            },
-          ),
+        title: const Text('New Environment Profile'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'e.g., DEV, PROD'),
+          autofocus: true,
         ),
         actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Create'),
           ),
         ],
       ),
     );
+
+    if (newName != null && newName.isNotEmpty) {
+      await ref.read(collectionsProvider.notifier).addEnvironmentProfile(widget.collection.id, newName);
+      // The dialog needs to be rebuilt to show the new profile
+      setState(() {
+        // This is a bit of a hack. A better way would be to watch the provider
+        // but for a dialog, this is simpler.
+        widget.collection.environmentProfiles.loadSync();
+      });
+    }
   }
 }

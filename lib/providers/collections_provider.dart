@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:isar/isar.dart';
 import '../models/collection_model.dart';
+import '../models/environment_profile_model.dart';
 import '../models/request_model.dart';
 import '../services/isar_service.dart';
 
@@ -41,27 +42,20 @@ class Collections extends _$Collections {
     }
   }
 
-  Future<void> updateEnvironment(Id collectionId, List<EnvironmentVariable> environment) async {
-    final collection = await _isar.collectionModels.get(collectionId);
-    if (collection != null) {
-      collection.environment = environment;
-      await _isar.writeTxn(() async {
-        await _isar.collectionModels.put(collection);
-      });
-      state = AsyncValue.data(await _fetchCollections());
-    }
-  }
-
   Future<void> deleteCollection(Id id) async {
-    // Also delete all requests inside the collection to avoid orphans
     final collection = await _isar.collectionModels.get(id);
     if (collection != null) {
       await _isar.writeTxn(() async {
-        // Load requests first
         await collection.requests.load();
+        await collection.environmentProfiles.load();
+        
         for (var req in collection.requests) {
           await _isar.requestModels.delete(req.id);
         }
+        for (var env in collection.environmentProfiles) {
+          await _isar.environmentProfiles.delete(env.id);
+        }
+        
         await _isar.collectionModels.delete(id);
       });
     }
@@ -91,15 +85,12 @@ class Collections extends _$Collections {
 
     if (request != null && newCollection != null && oldCollection != null) {
       await _isar.writeTxn(() async {
-        // **CORREÇÃO AQUI**: Carregar os links antes de modificar
         await oldCollection.requests.load();
         await newCollection.requests.load();
 
-        // Remove from old collection
         oldCollection.requests.remove(request);
         await oldCollection.requests.save();
 
-        // Add to new collection
         newCollection.requests.add(request);
         await newCollection.requests.save();
       });
@@ -121,5 +112,53 @@ class Collections extends _$Collections {
     });
     
     state = AsyncValue.data(await _fetchCollections());
+  }
+
+  // --- Environment Methods ---
+
+  Future<void> addEnvironmentProfile(Id collectionId, String name) async {
+    final collection = await _isar.collectionModels.get(collectionId);
+    if (collection != null) {
+      final newProfile = EnvironmentProfile()..name = name;
+      await _isar.writeTxn(() async {
+        await _isar.environmentProfiles.put(newProfile);
+        collection.environmentProfiles.add(newProfile);
+        await collection.environmentProfiles.save();
+        // If it's the first one, set it as active
+        if (collection.activeEnvironment.value == null) {
+          collection.activeEnvironment.value = newProfile;
+          await collection.activeEnvironment.save();
+        }
+      });
+      state = AsyncValue.data(await _fetchCollections());
+    }
+  }
+
+  Future<void> updateEnvironmentVariables(Id profileId, List<EnvironmentVariable> variables) async {
+    final profile = await _isar.environmentProfiles.get(profileId);
+    if (profile != null) {
+      profile.variables = variables;
+      await _isar.writeTxn(() async {
+        await _isar.environmentProfiles.put(profile);
+      });
+      // No need to refetch all collections, but for simplicity we do
+      state = AsyncValue.data(await _fetchCollections());
+    }
+  }
+
+  Future<void> setActiveEnvironment(Id collectionId, Id? profileId) async {
+    final collection = await _isar.collectionModels.get(collectionId);
+    if (collection != null) {
+      if (profileId == null) {
+        collection.activeEnvironment.value = null;
+      } else {
+        final profile = await _isar.environmentProfiles.get(profileId);
+        collection.activeEnvironment.value = profile;
+      }
+      await _isar.writeTxn(() async {
+        await collection.activeEnvironment.save();
+      });
+      state = AsyncValue.data(await _fetchCollections());
+    }
   }
 }

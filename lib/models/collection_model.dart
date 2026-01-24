@@ -1,5 +1,6 @@
 import 'package:isar/isar.dart';
 import 'request_model.dart';
+import 'environment_profile_model.dart';
 
 part 'collection_model.g.dart';
 
@@ -11,11 +12,9 @@ class CollectionModel {
 
   final requests = IsarLinks<RequestModel>();
 
-  List<EnvironmentVariable>? environment;
-}
+  // Link para o perfil de ambiente ativo
+  final activeEnvironment = IsarLink<EnvironmentProfile>();
 
-@embedded
-class EnvironmentVariable {
-  String? key;
-  String? value;
+  // Lista de todos os perfis de ambiente disponíveis para esta coleção
+  final environmentProfiles = IsarLinks<EnvironmentProfile>();
 }

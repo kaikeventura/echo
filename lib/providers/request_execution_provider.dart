@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/collection_model.dart';
+import '../models/environment_profile_model.dart';
 import '../models/request_model.dart';
 import '../models/response_model.dart';
 import '../services/http_service.dart';
@@ -35,7 +36,7 @@ class RequestExecution extends _$RequestExecution {
 
     try {
       // Create a clone of the request to avoid modifying the original
-      final requestToSend = _cloneAndInterpolate(activeRequest, parentCollection);
+      final requestToSend = await _cloneAndInterpolate(activeRequest, parentCollection);
       
       final httpService = HttpService();
       final response = await httpService.executeRequest(requestToSend);
@@ -45,7 +46,7 @@ class RequestExecution extends _$RequestExecution {
     }
   }
 
-  RequestModel _cloneAndInterpolate(RequestModel original, CollectionModel? collection) {
+  Future<RequestModel> _cloneAndInterpolate(RequestModel original, CollectionModel? collection) async {
     // Create a deep copy to avoid side effects
     final clone = RequestModel()
       ..id = original.id
@@ -63,8 +64,14 @@ class RequestExecution extends _$RequestExecution {
           .toList();
     }
 
-    // Get environment variables
-    final env = collection?.environment ?? [];
+    if (collection == null) return clone;
+
+    // Get active environment
+    await collection.activeEnvironment.load();
+    final activeProfile = collection.activeEnvironment.value;
+    if (activeProfile == null) return clone;
+
+    final env = activeProfile.variables ?? [];
     if (env.isEmpty) return clone;
 
     // Interpolate URL
