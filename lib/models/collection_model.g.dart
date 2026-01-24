@@ -35,6 +35,18 @@ const CollectionModelSchema = CollectionSchema(
       name: r'requests',
       target: r'RequestModel',
       single: false,
+    ),
+    r'activeEnvironment': LinkSchema(
+      id: -745832077699539396,
+      name: r'activeEnvironment',
+      target: r'EnvironmentProfile',
+      single: true,
+    ),
+    r'environmentProfiles': LinkSchema(
+      id: 5876168938010947097,
+      name: r'environmentProfiles',
+      target: r'EnvironmentProfile',
+      single: false,
     )
   },
   embeddedSchemas: {},
@@ -94,7 +106,11 @@ Id _collectionModelGetId(CollectionModel object) {
 }
 
 List<IsarLinkBase<dynamic>> _collectionModelGetLinks(CollectionModel object) {
-  return [object.requests];
+  return [
+    object.requests,
+    object.activeEnvironment,
+    object.environmentProfiles
+  ];
 }
 
 void _collectionModelAttach(
@@ -102,6 +118,10 @@ void _collectionModelAttach(
   object.id = id;
   object.requests
       .attach(col, col.isar.collection<RequestModel>(), r'requests', id);
+  object.activeEnvironment.attach(
+      col, col.isar.collection<EnvironmentProfile>(), r'activeEnvironment', id);
+  object.environmentProfiles.attach(col,
+      col.isar.collection<EnvironmentProfile>(), r'environmentProfiles', id);
 }
 
 extension CollectionModelQueryWhereSort
@@ -442,6 +462,83 @@ extension CollectionModelQueryLinks
     return QueryBuilder.apply(this, (query) {
       return query.linkLength(
           r'requests', lower, includeLower, upper, includeUpper);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      activeEnvironment(FilterQuery<EnvironmentProfile> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.link(q, r'activeEnvironment');
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      activeEnvironmentIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'activeEnvironment', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      environmentProfiles(FilterQuery<EnvironmentProfile> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.link(q, r'environmentProfiles');
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      environmentProfilesLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(
+          r'environmentProfiles', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      environmentProfilesIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'environmentProfiles', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      environmentProfilesIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'environmentProfiles', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      environmentProfilesLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'environmentProfiles', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      environmentProfilesLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(
+          r'environmentProfiles', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      environmentProfilesLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(
+          r'environmentProfiles', lower, includeLower, upper, includeUpper);
     });
   }
 }
