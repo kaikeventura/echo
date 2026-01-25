@@ -13,6 +13,7 @@ import '../../../providers/collections_provider.dart';
 import '../../../providers/request_execution_provider.dart';
 import '../../../utils/http_colors.dart';
 import '../../../widgets/key_value_table.dart';
+import 'autocomplete_manager.dart';
 
 class RequestEditorWidget extends ConsumerStatefulWidget {
   const RequestEditorWidget({super.key});
@@ -26,6 +27,13 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   late TabController _tabController;
   CodeController? _urlController;
   CodeController? _bodyController;
+  
+  // Focus Nodes
+  final FocusNode _urlFocusNode = FocusNode();
+  final FocusNode _bodyFocusNode = FocusNode();
+
+  final AutocompleteManager _autocompleteManager = AutocompleteManager();
+  List<String> _currentEnvKeys = [];
 
   // Estado de validação
   String? _bodyError;
@@ -42,9 +50,18 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    // Initialize with empty controllers to prevent null errors
+    _setupInitialControllers();
+  }
+  
+  void _setupInitialControllers() {
     _urlController = _createCodeController('', []);
     _bodyController = _createCodeController('', []);
+    _addListeners();
+  }
+  
+  void _addListeners() {
+    _urlController?.addListener(_handleAutocomplete);
+    _bodyController?.addListener(_handleAutocomplete);
   }
 
   @override
@@ -52,6 +69,8 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     _tabController.dispose();
     _urlController?.dispose();
     _bodyController?.dispose();
+    _urlFocusNode.dispose();
+    _bodyFocusNode.dispose();
     super.dispose();
   }
 
@@ -62,13 +81,13 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       orElse: () => CollectionModel(),
     );
 
-    List<String> envKeys = [];
+    _currentEnvKeys = [];
     if (parentCollection.id != 0) {
       parentCollection.activeEnvironment.loadSync();
       final activeProfile = parentCollection.activeEnvironment.value;
       if (activeProfile != null) {
         activeProfile.variables?.forEach((v) {
-          if (v.key != null) envKeys.add(v.key!);
+          if (v.key != null) _currentEnvKeys.add(v.key!);
         });
       }
     }
@@ -79,15 +98,12 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     _urlController?.dispose();
     _bodyController?.dispose();
 
-    _urlController = _createCodeController(activeRequest.url, envKeys);
-    _bodyController = _createCodeController(activeRequest.body ?? '', envKeys);
+    _urlController = _createCodeController(activeRequest.url, _currentEnvKeys);
+    _bodyController = _createCodeController(activeRequest.body ?? '', _currentEnvKeys);
+    _addListeners();
     
-    if (oldUrlSelection != null) {
-      _urlController?.selection = oldUrlSelection;
-    }
-    if (oldBodySelection != null) {
-      _bodyController?.selection = oldBodySelection;
-    }
+    if (oldUrlSelection != null) _urlController?.selection = oldUrlSelection;
+    if (oldBodySelection != null) _bodyController?.selection = oldBodySelection;
   }
 
   CodeController _createCodeController(String text, List<String> envKeys) {
@@ -95,18 +111,83 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     if (envKeys.isNotEmpty) {
       final escapedKeys = envKeys.map((k) => RegExp.escape(k)).toList();
-      // Use non-capturing group (?:...) to avoid RangeError
       final validKeysPattern = r'\{\{(?:' + escapedKeys.join('|') + r')\}\}';
       patternMap[validKeysPattern] = const TextStyle(color: Colors.green, fontWeight: FontWeight.bold);
     }
 
-    // Use non-capturing group here as well
-    patternMap[r'\{\{(?:[a-zA-Z0-9_]+)\}\}'] = const TextStyle(color: Colors.redAccent);
+    patternMap[r'\{\{[^}]*\}\}'] = const TextStyle(color: Colors.redAccent);
 
     return CodeController(
       text: text,
       patternMap: patternMap,
     );
+  }
+  
+  void _handleAutocomplete() {
+    CodeController? controller;
+    
+    if (_urlFocusNode.hasFocus) {
+      controller = _urlController;
+    } else if (_bodyFocusNode.hasFocus) {
+      controller = _bodyController;
+    }
+
+    if (controller == null) {
+      _autocompleteManager.hide();
+      return;
+    }
+
+    final text = controller.text;
+    final selection = controller.selection;
+    if (!selection.isCollapsed) {
+      _autocompleteManager.hide();
+      return;
+    }
+
+    // Find the last '{{' before the cursor
+    final beforeCursor = text.substring(0, selection.baseOffset);
+    final triggerIndex = beforeCursor.lastIndexOf('{{');
+
+    if (triggerIndex != -1) {
+      // Check if we are inside a variable block (i.e., no closing '}}' before cursor)
+      final afterTrigger = beforeCursor.substring(triggerIndex + 2);
+      if (!afterTrigger.contains('}}')) {
+        final partial = afterTrigger;
+        final suggestions = _currentEnvKeys
+            .where((key) => key.toLowerCase().startsWith(partial.toLowerCase()))
+            .toList();
+
+        if (suggestions.isNotEmpty) {
+          _autocompleteManager.showSuggestions(
+            context,
+            controller,
+            suggestions,
+            (selected) {
+              final newText = text.substring(0, triggerIndex) +
+                  '{{$selected}}' +
+                  text.substring(selection.baseOffset);
+              controller!.text = newText;
+              controller.selection = TextSelection.fromPosition(
+                TextPosition(offset: triggerIndex + selected.length + 4),
+              );
+              // Trigger save
+              final activeRequest = ref.read(activeRequestProvider);
+              if (activeRequest != null) {
+                if (controller == _urlController) {
+                  activeRequest.url = newText;
+                } else {
+                  activeRequest.body = newText;
+                }
+                _saveRequest(activeRequest);
+              }
+            },
+          );
+          return;
+        }
+      }
+    }
+    
+    _autocompleteManager.hide();
   }
 
   @override
@@ -148,7 +229,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     if (_urlController?.text != activeRequest.url) {
        _urlController?.text = activeRequest.url;
     }
-
+    
     if (_bodyController?.text != (activeRequest.body ?? '')) {
       _bodyController?.text = activeRequest.body ?? '';
     }
@@ -263,13 +344,17 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: CodeField(
-              controller: _urlController!,
-              textStyle: GoogleFonts.inter(fontSize: 14),
-              onChanged: (val) {
-                request.url = val;
-                _saveRequest(request);
-              },
+            child: CompositedTransformTarget(
+              link: _autocompleteManager.layerLink,
+              child: CodeField(
+                controller: _urlController!,
+                focusNode: _urlFocusNode,
+                textStyle: GoogleFonts.inter(fontSize: 14),
+                onChanged: (val) {
+                  request.url = val;
+                  _saveRequest(request);
+                },
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -557,14 +642,18 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: CodeField(
-        controller: _bodyController!,
-        textStyle: GoogleFonts.jetBrainsMono(fontSize: 13, height: 1.5),
-        onChanged: (val) {
-          request.body = val;
-          _validateBody(val, type);
-          _saveRequest(request);
-        },
+      child: CompositedTransformTarget(
+        link: _autocompleteManager.layerLink,
+        child: CodeField(
+          controller: _bodyController!,
+          focusNode: _bodyFocusNode,
+          textStyle: GoogleFonts.jetBrainsMono(fontSize: 13, height: 1.5),
+          onChanged: (val) {
+            request.body = val;
+            _validateBody(val, type);
+            _saveRequest(request);
+          },
+        ),
       ),
     );
   }
