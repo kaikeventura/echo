@@ -73,27 +73,35 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       }
     }
     
-    // Dispose old controllers and create new ones
+    final oldUrlSelection = _urlController?.selection;
+    final oldBodySelection = _bodyController?.selection;
+    
     _urlController?.dispose();
     _bodyController?.dispose();
 
     _urlController = _createCodeController(activeRequest.url, envKeys);
     _bodyController = _createCodeController(activeRequest.body ?? '', envKeys);
+    
+    if (oldUrlSelection != null) {
+      _urlController?.selection = oldUrlSelection;
+    }
+    if (oldBodySelection != null) {
+      _bodyController?.selection = oldBodySelection;
+    }
   }
 
   CodeController _createCodeController(String text, List<String> envKeys) {
     final patternMap = LinkedHashMap<String, TextStyle>();
 
-    // Pattern for valid variables (green)
     if (envKeys.isNotEmpty) {
-      // Escape special characters in keys for regex
       final escapedKeys = envKeys.map((k) => RegExp.escape(k)).toList();
-      final validKeysPattern = r'\{\{(' + escapedKeys.join('|') + r')\}\}';
-      patternMap[validKeysPattern] = const TextStyle(color: Colors.green);
+      // Use non-capturing group (?:...) to avoid RangeError
+      final validKeysPattern = r'\{\{(?:' + escapedKeys.join('|') + r')\}\}';
+      patternMap[validKeysPattern] = const TextStyle(color: Colors.green, fontWeight: FontWeight.bold);
     }
 
-    // General pattern for any other {{...}} (red)
-    patternMap[r'\{\{([a-zA-Z0-9_]+)\}\}'] = const TextStyle(color: Colors.redAccent);
+    // Use non-capturing group here as well
+    patternMap[r'\{\{(?:[a-zA-Z0-9_]+)\}\}'] = const TextStyle(color: Colors.redAccent);
 
     return CodeController(
       text: text,
@@ -121,7 +129,14 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       );
     }
 
-    // When active request changes, we need to rebuild the controllers
+    ref.listen(collectionsProvider, (previous, next) {
+       if (activeRequest != null) {
+         setState(() {
+           _updateCodeControllers(activeRequest);
+         });
+       }
+    });
+
     ref.listen(activeRequestProvider, (previous, next) {
       if (previous?.id != next?.id) {
         setState(() {
@@ -130,10 +145,10 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       }
     });
 
-    // Update text if it's different (e.g. from bulk edit)
     if (_urlController?.text != activeRequest.url) {
-      _urlController?.text = activeRequest.url;
+       _urlController?.text = activeRequest.url;
     }
+
     if (_bodyController?.text != (activeRequest.body ?? '')) {
       _bodyController?.text = activeRequest.body ?? '';
     }
