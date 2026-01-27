@@ -99,27 +99,63 @@ class Collections extends _$Collections {
     }
   }
 
-  Future<void> moveRequestToCollection(Id requestId, Id newCollectionId, Id oldCollectionId) async {
-    if (newCollectionId == oldCollectionId) return;
-
-    final request = await _isar.requestModels.get(requestId);
-    final newCollection = await _isar.collectionModels.get(newCollectionId);
-    final oldCollection = await _isar.collectionModels.get(oldCollectionId);
-
-    if (request != null && newCollection != null && oldCollection != null) {
-      await _isar.writeTxn(() async {
-        await oldCollection.requests.load();
-        await newCollection.requests.load();
-
-        oldCollection.requests.remove(request);
-        await oldCollection.requests.save();
-
-        newCollection.requests.add(request);
-        await newCollection.requests.save();
-      });
-      
-      state = AsyncValue.data(await _fetchCollections());
+  // Método unificado para mover requests entre pastas e coleções
+  Future<void> moveRequest({
+    required Id requestId,
+    required Id sourceCollectionId,
+    required Id? sourceFolderId,
+    required Id targetCollectionId,
+    required Id? targetFolderId,
+  }) async {
+    // Se a origem e o destino forem exatamente os mesmos, não faz nada
+    if (sourceCollectionId == targetCollectionId && sourceFolderId == targetFolderId) {
+      return;
     }
+
+    await _isar.writeTxn(() async {
+      final request = await _isar.requestModels.get(requestId);
+      if (request == null) return;
+
+      // 1. Remover da Origem
+      if (sourceFolderId != null) {
+        // Estava em uma pasta
+        final srcFolder = await _isar.folderModels.get(sourceFolderId);
+        if (srcFolder != null) {
+          await srcFolder.requests.load();
+          srcFolder.requests.remove(request);
+          await srcFolder.requests.save();
+        }
+      } else {
+        // Estava na raiz da coleção
+        final srcCol = await _isar.collectionModels.get(sourceCollectionId);
+        if (srcCol != null) {
+          await srcCol.requests.load();
+          srcCol.requests.remove(request);
+          await srcCol.requests.save();
+        }
+      }
+
+      // 2. Adicionar ao Destino
+      if (targetFolderId != null) {
+        // Vai para uma pasta
+        final tgtFolder = await _isar.folderModels.get(targetFolderId);
+        if (tgtFolder != null) {
+          await tgtFolder.requests.load();
+          tgtFolder.requests.add(request);
+          await tgtFolder.requests.save();
+        }
+      } else {
+        // Vai para a raiz da coleção
+        final tgtCol = await _isar.collectionModels.get(targetCollectionId);
+        if (tgtCol != null) {
+          await tgtCol.requests.load();
+          tgtCol.requests.add(request);
+          await tgtCol.requests.save();
+        }
+      }
+    });
+
+    state = AsyncValue.data(await _fetchCollections());
   }
 
   Future<void> updateRequest(RequestModel request) async {

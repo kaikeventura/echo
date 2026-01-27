@@ -89,9 +89,21 @@ class SidebarWidget extends ConsumerWidget {
   Widget _buildCollectionTile(
       BuildContext context, WidgetRef ref, CollectionModel collection) {
     return DragTarget<RequestDragData>(
-      onWillAccept: (data) => data != null,
+      onWillAccept: (data) {
+        // Aceita se não for nulo e se o destino for diferente da origem
+        if (data == null) return false;
+        // Se a origem for a mesma coleção E estiver na raiz (sourceFolderId == null), não aceita (já está lá)
+        if (data.sourceCollectionId == collection.id && data.sourceFolderId == null) return false;
+        return true;
+      },
       onAccept: (data) {
-        // TODO: Implementar mover para raiz da coleção
+        ref.read(collectionsProvider.notifier).moveRequest(
+          requestId: data.request.id,
+          sourceCollectionId: data.sourceCollectionId,
+          sourceFolderId: data.sourceFolderId,
+          targetCollectionId: collection.id,
+          targetFolderId: null, // Mover para a raiz da coleção
+        );
       },
       builder: (context, candidateData, rejectedData) {
         final isTarget = candidateData.isNotEmpty;
@@ -127,9 +139,20 @@ class SidebarWidget extends ConsumerWidget {
 
   Widget _buildFolderTile(BuildContext context, WidgetRef ref, FolderModel folder, Id collectionId) {
     return DragTarget<RequestDragData>(
-      onWillAccept: (data) => true,
+      onWillAccept: (data) {
+        if (data == null) return false;
+        // Se a origem for a mesma pasta, não aceita
+        if (data.sourceFolderId == folder.id) return false;
+        return true;
+      },
       onAccept: (data) {
-        // TODO: Implementar mover para pasta
+        ref.read(collectionsProvider.notifier).moveRequest(
+          requestId: data.request.id,
+          sourceCollectionId: data.sourceCollectionId,
+          sourceFolderId: data.sourceFolderId,
+          targetCollectionId: collectionId,
+          targetFolderId: folder.id, // Mover para dentro desta pasta
+        );
       },
       builder: (context, candidateData, rejectedData) {
         final isTarget = candidateData.isNotEmpty;
