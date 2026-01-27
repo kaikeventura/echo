@@ -139,7 +139,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     final text = controller.text;
     final selection = controller.selection;
-    if (!selection.isCollapsed) {
+    if (!selection.isCollapsed || selection.baseOffset < 0 || selection.baseOffset > text.length) {
       _autocompleteManager.hide();
       return;
     }
@@ -404,51 +404,81 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     );
   }
 
-  Widget _buildParamsTab(RequestModel request) {
-    Map<String, String> params = {};
+  Map<String, String> _parseParamsFromUrl(String url) {
+    if (url.isEmpty) return {};
     try {
-      if (request.url.isNotEmpty) {
-        final uri = Uri.parse(request.url);
-        params = Map.from(uri.queryParameters);
-      }
+      final queryIndex = url.indexOf('?');
+      if (queryIndex == -1) return {};
+      
+      final queryString = url.substring(queryIndex + 1);
+      return Uri.splitQueryString(queryString);
     } catch (e) {
-      // Ignore parse errors
+      return {};
     }
+  }
+
+  void _updateUrlWithParams(RequestModel request, Map<String, String> newParams) {
+    try {
+      final url = request.url;
+      final queryIndex = url.indexOf('?');
+      final baseUrl = queryIndex == -1 ? url : url.substring(0, queryIndex);
+      
+      if (newParams.isEmpty) {
+        if (queryIndex != -1) {
+           request.url = baseUrl;
+           _saveRequest(request);
+        }
+        return;
+      }
+
+      // Manually build query string to control encoding
+      final pairs = <String>[];
+      newParams.forEach((key, value) {
+        // Encode key and value, but then restore {{ and }}
+        String encodedKey = Uri.encodeQueryComponent(key);
+        String encodedValue = Uri.encodeQueryComponent(value);
+        
+        encodedKey = _restoreVariableBraces(encodedKey);
+        encodedValue = _restoreVariableBraces(encodedValue);
+        
+        pairs.add('$encodedKey=$encodedValue');
+      });
+      
+      final queryString = pairs.join('&');
+      request.url = '$baseUrl?$queryString';
+      _saveRequest(request);
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  String _restoreVariableBraces(String text) {
+    return text
+      .replaceAll('%7B%7B', '{{')
+      .replaceAll('%7D%7D', '}}')
+      .replaceAll('%7b%7b', '{{')
+      .replaceAll('%7d%7d', '}}');
+  }
+
+  Widget _buildParamsTab(RequestModel request) {
+    final params = _parseParamsFromUrl(request.url);
 
     return KeyValueTable(
       items: params,
       onChanged: (key, value, oldKey) {
-        try {
-          final uri = request.url.isNotEmpty ? Uri.parse(request.url) : Uri();
-          final currentParams = Map<String, String>.from(uri.queryParameters);
-
-          if (oldKey.isNotEmpty && oldKey != key) {
-            currentParams.remove(oldKey);
-          }
-          
-          if (key.isNotEmpty) {
-            currentParams[key] = value;
-          }
-
-          final newUri = uri.replace(queryParameters: currentParams);
-          request.url = newUri.toString();
-          _saveRequest(request);
-        } catch (e) {
-          // Handle error
+        final currentParams = Map<String, String>.from(params);
+        if (oldKey.isNotEmpty && oldKey != key) {
+          currentParams.remove(oldKey);
         }
+        if (key.isNotEmpty) {
+          currentParams[key] = value;
+        }
+        _updateUrlWithParams(request, currentParams);
       },
       onDeleted: (key) {
-        try {
-          final uri = request.url.isNotEmpty ? Uri.parse(request.url) : Uri();
-          final currentParams = Map<String, String>.from(uri.queryParameters);
-          currentParams.remove(key);
-          
-          final newUri = uri.replace(queryParameters: currentParams);
-          request.url = newUri.toString();
-          _saveRequest(request);
-        } catch (e) {
-          // Handle error
-        }
+        final currentParams = Map<String, String>.from(params);
+        currentParams.remove(key);
+        _updateUrlWithParams(request, currentParams);
       },
     );
   }
@@ -819,15 +849,13 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   Future<void> _showBulkEditDialogForParams(RequestModel request) async {
-    final uri = Uri.parse(request.url);
-    final text = uri.queryParameters.entries.map((e) => '${e.key}:${e.value}').join('\n');
+    final params = _parseParamsFromUrl(request.url);
+    final text = params.entries.map((e) => '${e.key}:${e.value}').join('\n');
     final newText = await _showBulkEditDialog(context, 'Params', text);
 
     if (newText != null) {
       final newParams = _parseBulkText(newText);
-      final newUri = uri.replace(queryParameters: newParams);
-      request.url = newUri.toString();
-      _saveRequest(request);
+      _updateUrlWithParams(request, newParams);
     }
   }
 

@@ -75,7 +75,7 @@ class RequestExecution extends _$RequestExecution {
     if (env.isEmpty) return clone;
 
     // Interpolate URL
-    clone.url = _interpolateString(clone.url, env);
+    clone.url = _interpolateUrl(clone.url, env);
 
     // Interpolate Headers
     if (clone.headers != null) {
@@ -90,12 +90,40 @@ class RequestExecution extends _$RequestExecution {
     return clone;
   }
 
+  String _interpolateUrl(String url, List<EnvironmentVariable> env) {
+    String result = url;
+    for (var variable in env) {
+      if (variable.key != null && variable.value != null) {
+        final key = variable.key!;
+        final value = variable.value!;
+        final encodedValue = Uri.encodeComponent(value);
+        
+        // Replace encoded %7B%7Bkey%7D%7D with encoded value
+        result = result.replaceAll('%7B%7B$key%7D%7D', encodedValue);
+        result = result.replaceAll('%7b%7b$key%7d%7d', encodedValue);
+        
+        // Replace raw {{key}} with encoded value (because it's a URL)
+        result = result.replaceAll('{{$key}}', encodedValue);
+      }
+    }
+    return result;
+  }
+
   String _interpolateString(String? text, List<EnvironmentVariable> env) {
     if (text == null) return '';
     String result = text;
     for (var variable in env) {
       if (variable.key != null && variable.value != null) {
-        result = result.replaceAll('{{${variable.key}}}', variable.value!);
+        final key = variable.key!;
+        final value = variable.value!;
+        
+        // Replace {{key}} with raw value
+        result = result.replaceAll('{{$key}}', value);
+        
+        // Replace encoded %7B%7Bkey%7D%7D with encoded value
+        final encodedValue = Uri.encodeComponent(value);
+        result = result.replaceAll('%7B%7B$key%7D%7D', encodedValue);
+        result = result.replaceAll('%7b%7b$key%7d%7d', encodedValue);
       }
     }
     return result;
