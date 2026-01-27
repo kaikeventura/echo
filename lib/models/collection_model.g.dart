@@ -36,6 +36,12 @@ const CollectionModelSchema = CollectionSchema(
       target: r'RequestModel',
       single: false,
     ),
+    r'folders': LinkSchema(
+      id: -8105905071222111764,
+      name: r'folders',
+      target: r'FolderModel',
+      single: false,
+    ),
     r'activeEnvironment': LinkSchema(
       id: -745832077699539396,
       name: r'activeEnvironment',
@@ -108,6 +114,7 @@ Id _collectionModelGetId(CollectionModel object) {
 List<IsarLinkBase<dynamic>> _collectionModelGetLinks(CollectionModel object) {
   return [
     object.requests,
+    object.folders,
     object.activeEnvironment,
     object.environmentProfiles
   ];
@@ -118,6 +125,8 @@ void _collectionModelAttach(
   object.id = id;
   object.requests
       .attach(col, col.isar.collection<RequestModel>(), r'requests', id);
+  object.folders
+      .attach(col, col.isar.collection<FolderModel>(), r'folders', id);
   object.activeEnvironment.attach(
       col, col.isar.collection<EnvironmentProfile>(), r'activeEnvironment', id);
   object.environmentProfiles.attach(col,
@@ -462,6 +471,67 @@ extension CollectionModelQueryLinks
     return QueryBuilder.apply(this, (query) {
       return query.linkLength(
           r'requests', lower, includeLower, upper, includeUpper);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition> folders(
+      FilterQuery<FolderModel> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.link(q, r'folders');
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      foldersLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'folders', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      foldersIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'folders', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      foldersIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'folders', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      foldersLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'folders', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      foldersLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'folders', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<CollectionModel, CollectionModel, QAfterFilterCondition>
+      foldersLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(
+          r'folders', lower, includeLower, upper, includeUpper);
     });
   }
 

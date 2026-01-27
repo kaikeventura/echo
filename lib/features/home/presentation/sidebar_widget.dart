@@ -6,17 +6,18 @@ import 'package:isar/isar.dart';
 import '../../../models/collection_model.dart';
 import '../../../models/environment_profile_model.dart';
 import '../../../models/request_model.dart';
+import '../../../models/folder_model.dart';
 import '../../../providers/active_request_provider.dart';
 import '../../../providers/collections_provider.dart';
 import '../../../providers/open_requests_provider.dart';
 import '../../../utils/http_colors.dart';
-import '../../../widgets/key_value_table.dart';
 
 // Helper class to carry drag data
 class RequestDragData {
   final RequestModel request;
   final Id sourceCollectionId;
-  RequestDragData(this.request, this.sourceCollectionId);
+  final Id? sourceFolderId;
+  RequestDragData(this.request, this.sourceCollectionId, {this.sourceFolderId});
 }
 
 class SidebarWidget extends ConsumerWidget {
@@ -88,13 +89,9 @@ class SidebarWidget extends ConsumerWidget {
   Widget _buildCollectionTile(
       BuildContext context, WidgetRef ref, CollectionModel collection) {
     return DragTarget<RequestDragData>(
-      onWillAccept: (data) => data?.sourceCollectionId != collection.id,
+      onWillAccept: (data) => data != null,
       onAccept: (data) {
-        ref.read(collectionsProvider.notifier).moveRequestToCollection(
-              data.request.id,
-              collection.id,
-              data.sourceCollectionId,
-            );
+        // TODO: Implementar mover para raiz da coleção
       },
       builder: (context, candidateData, rejectedData) {
         final isTarget = candidateData.isNotEmpty;
@@ -117,8 +114,50 @@ class SidebarWidget extends ConsumerWidget {
               iconColor: Colors.white54,
               collapsedIconColor: Colors.white38,
               trailing: _buildCollectionMenu(context, ref, collection),
-              children: collection.requests.map((request) {
-                return _buildRequestTile(context, ref, request, collection.id);
+              children: [
+                ...collection.folders.map((folder) => _buildFolderTile(context, ref, folder, collection.id)),
+                ...collection.requests.map((request) => _buildRequestTile(context, ref, request, collection.id, null)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFolderTile(BuildContext context, WidgetRef ref, FolderModel folder, Id collectionId) {
+    return DragTarget<RequestDragData>(
+      onWillAccept: (data) => true,
+      onAccept: (data) {
+        // TODO: Implementar mover para pasta
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isTarget = candidateData.isNotEmpty;
+        return Container(
+          margin: const EdgeInsets.only(left: 12),
+          decoration: BoxDecoration(
+             color: isTarget ? Theme.of(context).colorScheme.primary.withOpacity(0.2) : Colors.transparent,
+             borderRadius: BorderRadius.circular(4),
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              title: Row(
+                children: [
+                  const Icon(Icons.folder_open, size: 16, color: Colors.white54),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      folder.name,
+                      style: GoogleFonts.inter(fontSize: 13, color: Colors.white70),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              trailing: _buildFolderMenu(context, ref, folder, collectionId),
+              children: folder.requests.map((request) {
+                return _buildRequestTile(context, ref, request, collectionId, folder.id);
               }).toList(),
             ),
           ),
@@ -137,29 +176,48 @@ class SidebarWidget extends ConsumerWidget {
           _showRenameCollectionDialog(context, ref, collection);
         } else if (value == 'delete') {
           _showDeleteCollectionDialog(context, ref, collection);
+        } else if (value == 'new_folder') {
+          _showCreateFolderDialog(context, ref, collection.id);
+        } else if (value == 'new_request') {
+          _showCreateRequestDialog(context, ref, preSelectedCollection: collection);
         }
       },
       itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'rename',
-          height: 32,
-          child: Text('Rename', style: TextStyle(fontSize: 13)),
-        ),
-        const PopupMenuItem(
-          value: 'delete',
-          height: 32,
-          child: Text('Delete', style: TextStyle(fontSize: 13, color: Colors.redAccent)),
-        ),
+        const PopupMenuItem(value: 'new_request', height: 32, child: Text('New Request', style: TextStyle(fontSize: 13))),
+        const PopupMenuItem(value: 'new_folder', height: 32, child: Text('New Folder', style: TextStyle(fontSize: 13))),
+        const PopupMenuDivider(),
+        const PopupMenuItem(value: 'rename', height: 32, child: Text('Rename', style: TextStyle(fontSize: 13))),
+        const PopupMenuItem(value: 'delete', height: 32, child: Text('Delete', style: TextStyle(fontSize: 13, color: Colors.redAccent))),
+      ],
+    );
+  }
+
+  Widget _buildFolderMenu(BuildContext context, WidgetRef ref, FolderModel folder, Id collectionId) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert, size: 16, color: Colors.white38),
+      splashRadius: 16,
+      tooltip: 'Options',
+      onSelected: (value) {
+        if (value == 'delete') {
+          _showDeleteFolderDialog(context, ref, folder);
+        } else if (value == 'new_request') {
+          _showCreateRequestDialog(context, ref, preSelectedCollectionId: collectionId, preSelectedFolder: folder);
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem(value: 'new_request', height: 32, child: Text('New Request', style: TextStyle(fontSize: 13))),
+        const PopupMenuItem(value: 'delete', height: 32, child: Text('Delete', style: TextStyle(fontSize: 13, color: Colors.redAccent))),
       ],
     );
   }
 
   Widget _buildRequestTile(
-      BuildContext context, WidgetRef ref, RequestModel request, Id sourceCollectionId) {
+      BuildContext context, WidgetRef ref, RequestModel request, Id sourceCollectionId, Id? sourceFolderId) {
     final activeRequest = ref.watch(activeRequestProvider);
     final isActive = activeRequest?.id == request.id;
 
     final tileContent = Container(
+      margin: const EdgeInsets.only(left: 12), // Indentação para requests
       decoration: BoxDecoration(
         color: isActive ? Theme.of(context).colorScheme.primary.withOpacity(0.15) : Colors.transparent,
         border: Border(
@@ -171,7 +229,7 @@ class SidebarWidget extends ConsumerWidget {
       ),
       child: ListTile(
         dense: true,
-        contentPadding: const EdgeInsets.only(left: 28, right: 8),
+        contentPadding: const EdgeInsets.only(left: 16, right: 8),
         visualDensity: const VisualDensity(vertical: -2),
         title: Text(
           request.name,
@@ -197,7 +255,7 @@ class SidebarWidget extends ConsumerWidget {
     );
 
     return LongPressDraggable<RequestDragData>(
-      data: RequestDragData(request, sourceCollectionId),
+      data: RequestDragData(request, sourceCollectionId, sourceFolderId: sourceFolderId),
       feedback: Material(
         color: Colors.transparent,
         child: Container(
@@ -256,6 +314,7 @@ class SidebarWidget extends ConsumerWidget {
     );
   }
 
+  // ... (Métodos de interpolação e cURL mantidos iguais) ...
   void _copyCurlToClipboard(BuildContext context, WidgetRef ref, RequestModel request) {
     final collections = ref.read(collectionsProvider).valueOrNull ?? [];
     
@@ -265,6 +324,14 @@ class SidebarWidget extends ConsumerWidget {
         parentCollection = col;
         break;
       }
+      // Check folders
+      for (var folder in col.folders) {
+        if (folder.requests.any((r) => r.id == request.id)) {
+          parentCollection = col;
+          break;
+        }
+      }
+      if (parentCollection != null) break;
     }
 
     RequestModel requestToUse = request;
@@ -408,6 +475,39 @@ class SidebarWidget extends ConsumerWidget {
     );
   }
 
+  Future<void> _showCreateFolderDialog(
+      BuildContext context, WidgetRef ref, Id collectionId) async {
+    final controller = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('New Folder'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'Folder Name'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                ref
+                    .read(collectionsProvider.notifier)
+                    .addFolder(collectionId, controller.text);
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showRenameCollectionDialog(
       BuildContext context, WidgetRef ref, CollectionModel collection) async {
     final controller = TextEditingController(text: collection.name);
@@ -466,8 +566,33 @@ class SidebarWidget extends ConsumerWidget {
     );
   }
 
+  Future<void> _showDeleteFolderDialog(
+      BuildContext context, WidgetRef ref, FolderModel folder) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Folder'),
+        content: Text('Are you sure you want to delete "${folder.name}" and all its requests?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            onPressed: () {
+              ref.read(collectionsProvider.notifier).deleteFolder(folder.id);
+              Navigator.pop(context);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showCreateRequestDialog(
-      BuildContext context, WidgetRef ref) async {
+      BuildContext context, WidgetRef ref, {CollectionModel? preSelectedCollection, Id? preSelectedCollectionId, FolderModel? preSelectedFolder}) async {
     final collections = ref.read(collectionsProvider).valueOrNull ?? [];
     if (collections.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -477,7 +602,18 @@ class SidebarWidget extends ConsumerWidget {
     }
 
     final nameController = TextEditingController();
-    CollectionModel? selectedCollection = collections.first;
+    
+    CollectionModel? selectedCollection;
+    // Determine initial selected collection
+    if (preSelectedCollection != null) {
+      selectedCollection = preSelectedCollection;
+    } else if (preSelectedCollectionId != null) {
+      selectedCollection = collections.firstWhere((c) => c.id == preSelectedCollectionId, orElse: () => collections.first);
+    } else {
+      // If no pre-selected, use the first available collection
+      selectedCollection = collections.first;
+    }
+
     String selectedMethod = 'GET';
 
     await showDialog(
@@ -494,14 +630,15 @@ class SidebarWidget extends ConsumerWidget {
                 autofocus: true,
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<CollectionModel>(
-                value: selectedCollection,
-                decoration: const InputDecoration(labelText: 'Collection'),
-                items: collections.map((c) {
-                  return DropdownMenuItem(value: c, child: Text(c.name));
-                }).toList(),
-                onChanged: (val) => setState(() => selectedCollection = val),
-              ),
+              if (preSelectedFolder == null) // Só mostra dropdown se não estiver criando dentro de uma pasta específica
+                DropdownButtonFormField<CollectionModel>(
+                  value: selectedCollection,
+                  decoration: const InputDecoration(labelText: 'Collection'),
+                  items: collections.map((c) {
+                    return DropdownMenuItem(value: c, child: Text(c.name));
+                  }).toList(),
+                  onChanged: (val) => setState(() => selectedCollection = val),
+                ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: selectedMethod,
@@ -528,10 +665,17 @@ class SidebarWidget extends ConsumerWidget {
                     ..url = ''
                     ..savedAt = DateTime.now();
                   
-                  await ref.read(collectionsProvider.notifier).addRequestToCollection(
-                        selectedCollection!.id,
-                        newRequest,
-                      );
+                  if (preSelectedFolder != null) {
+                    await ref.read(collectionsProvider.notifier).addRequestToFolder(
+                      preSelectedFolder.id,
+                      newRequest,
+                    );
+                  } else {
+                    await ref.read(collectionsProvider.notifier).addRequestToCollection(
+                          selectedCollection!.id,
+                          newRequest,
+                        );
+                  }
                   
                   if (context.mounted) {
                     ref.read(openRequestsProvider.notifier).openRequest(newRequest);

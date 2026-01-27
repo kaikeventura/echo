@@ -89,12 +89,25 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     return true;
   }
 
+  CollectionModel _findParentCollection(List<CollectionModel> collections, RequestModel request) {
+    for (var col in collections) {
+      // Check root requests
+      if (col.requests.any((r) => r.id == request.id)) {
+        return col;
+      }
+      // Check folders
+      for (var folder in col.folders) {
+        if (folder.requests.any((r) => r.id == request.id)) {
+          return col;
+        }
+      }
+    }
+    return CollectionModel(); // Not found
+  }
+
   void _updateCodeControllers(RequestModel activeRequest) {
     final collections = ref.read(collectionsProvider).valueOrNull ?? [];
-    final parentCollection = collections.firstWhere(
-      (c) => c.requests.any((r) => r.id == activeRequest.id),
-      orElse: () => CollectionModel(),
-    );
+    final parentCollection = _findParentCollection(collections, activeRequest);
 
     List<String> newEnvKeys = [];
     if (parentCollection.id != 0) {
@@ -393,10 +406,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       BuildContext context, WidgetRef ref, RequestModel request) {
     
     final collections = ref.watch(collectionsProvider).valueOrNull ?? [];
-    final parentCollection = collections.firstWhere(
-      (c) => c.requests.any((r) => r.id == request.id),
-      orElse: () => CollectionModel(),
-    );
+    final parentCollection = _findParentCollection(collections, request);
     
     if (parentCollection.id != 0) {
       parentCollection.activeEnvironment.loadSync();
@@ -945,10 +955,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     if (activeRequest == null) return;
 
     final collections = ref.read(collectionsProvider).valueOrNull ?? [];
-    final parentCollection = collections.firstWhere(
-      (c) => c.requests.any((r) => r.id == activeRequest.id),
-      orElse: () => CollectionModel(),
-    );
+    final parentCollection = _findParentCollection(collections, activeRequest);
 
     if (parentCollection.id == 0) return; // Not found
 

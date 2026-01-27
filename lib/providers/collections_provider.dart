@@ -3,6 +3,7 @@ import 'package:isar/isar.dart';
 import '../models/collection_model.dart';
 import '../models/environment_profile_model.dart';
 import '../models/request_model.dart';
+import '../models/folder_model.dart';
 import '../services/isar_service.dart';
 
 part 'collections_provider.g.dart';
@@ -18,7 +19,16 @@ class Collections extends _$Collections {
   }
 
   Future<List<CollectionModel>> _fetchCollections() async {
-    return await _isar.collectionModels.where().findAll();
+    final collections = await _isar.collectionModels.where().findAll();
+    // Pré-carregar relacionamentos para evitar problemas de UI
+    for (var c in collections) {
+      await c.folders.load();
+      for (var f in c.folders) {
+        await f.requests.load();
+      }
+      await c.requests.load();
+    }
+    return collections;
   }
 
   Future<void> addCollection(String name) async {
@@ -47,11 +57,24 @@ class Collections extends _$Collections {
     if (collection != null) {
       await _isar.writeTxn(() async {
         await collection.requests.load();
+        await collection.folders.load();
         await collection.environmentProfiles.load();
         
+        // Deletar requests da raiz
         for (var req in collection.requests) {
           await _isar.requestModels.delete(req.id);
         }
+
+        // Deletar pastas e seus requests
+        for (var folder in collection.folders) {
+          await folder.requests.load();
+          for (var req in folder.requests) {
+            await _isar.requestModels.delete(req.id);
+          }
+          await _isar.folderModels.delete(folder.id);
+        }
+
+        // Deletar perfis de ambiente
         for (var env in collection.environmentProfiles) {
           await _isar.environmentProfiles.delete(env.id);
         }
@@ -112,6 +135,49 @@ class Collections extends _$Collections {
     });
     
     state = AsyncValue.data(await _fetchCollections());
+  }
+
+  // --- Folder Methods ---
+
+  Future<void> addFolder(Id collectionId, String name) async {
+    final collection = await _isar.collectionModels.get(collectionId);
+    if (collection != null) {
+      final newFolder = FolderModel()..name = name;
+      
+      await _isar.writeTxn(() async {
+        await _isar.folderModels.put(newFolder);
+        collection.folders.add(newFolder);
+        await collection.folders.save();
+      });
+      
+      state = AsyncValue.data(await _fetchCollections());
+    }
+  }
+
+  Future<void> deleteFolder(Id folderId) async {
+    final folder = await _isar.folderModels.get(folderId);
+    if (folder != null) {
+      await _isar.writeTxn(() async {
+        await folder.requests.load();
+        for (var req in folder.requests) {
+          await _isar.requestModels.delete(req.id);
+        }
+        await _isar.folderModels.delete(folderId);
+      });
+      state = AsyncValue.data(await _fetchCollections());
+    }
+  }
+
+  Future<void> addRequestToFolder(Id folderId, RequestModel request) async {
+    final folder = await _isar.folderModels.get(folderId);
+    if (folder != null) {
+      await _isar.writeTxn(() async {
+        await _isar.requestModels.put(request);
+        folder.requests.add(request);
+        await folder.requests.save();
+      });
+      state = AsyncValue.data(await _fetchCollections());
+    }
   }
 
   // --- Environment Methods ---
