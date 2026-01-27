@@ -8,6 +8,7 @@ import 'features/home/presentation/request_tabs_widget.dart';
 import 'features/home/presentation/splash_screen.dart';
 import 'features/request/presentation/request_editor_widget.dart';
 import 'features/request/presentation/response_panel_widget.dart';
+import 'features/home/presentation/top_menu_bar.dart'; // Importar TopMenuBar
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -83,14 +84,11 @@ class EchoHome extends StatelessWidget {
     return Scaffold(
       // Topbar customizada que permite arrastar a janela
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(40),
+        preferredSize: const Size.fromHeight(40), // Altura padrão da barra de título
         child: WindowCaption(
           brightness: Brightness.dark,
           backgroundColor: const Color(0xFF1E1E1E), // Mesma cor do fundo
-          title: Text(
-              'Echo',
-              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white54)
-          ),
+          title: const TopMenuBar(), // A nova barra de menu sem o texto Echo
         ),
       ),
       body: MultiSplitViewTheme(
