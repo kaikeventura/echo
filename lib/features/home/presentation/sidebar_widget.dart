@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:isar/isar.dart';
 import '../../../models/collection_model.dart';
+import '../../../models/environment_profile_model.dart';
 import '../../../models/request_model.dart';
 import '../../../providers/active_request_provider.dart';
 import '../../../providers/collections_provider.dart';
@@ -230,6 +232,8 @@ class SidebarWidget extends ConsumerWidget {
           _showRenameRequestDialog(context, ref, request);
         } else if (value == 'delete') {
           _showDeleteRequestDialog(context, ref, request);
+        } else if (value == 'copy_curl') {
+          _copyCurlToClipboard(context, ref, request);
         }
       },
       itemBuilder: (context) => [
@@ -239,12 +243,134 @@ class SidebarWidget extends ConsumerWidget {
           child: Text('Rename', style: TextStyle(fontSize: 13)),
         ),
         const PopupMenuItem(
+          value: 'copy_curl',
+          height: 32,
+          child: Text('Copy cURL', style: TextStyle(fontSize: 13)),
+        ),
+        const PopupMenuItem(
           value: 'delete',
           height: 32,
           child: Text('Delete', style: TextStyle(fontSize: 13, color: Colors.redAccent)),
         ),
       ],
     );
+  }
+
+  void _copyCurlToClipboard(BuildContext context, WidgetRef ref, RequestModel request) {
+    final collections = ref.read(collectionsProvider).valueOrNull ?? [];
+    
+    CollectionModel? parentCollection;
+    for (var col in collections) {
+      if (col.requests.any((r) => r.id == request.id)) {
+        parentCollection = col;
+        break;
+      }
+    }
+
+    RequestModel requestToUse = request;
+
+    if (parentCollection != null) {
+       if (!parentCollection.activeEnvironment.isLoaded) {
+         parentCollection.activeEnvironment.loadSync();
+       }
+       final activeProfile = parentCollection.activeEnvironment.value;
+       
+       if (activeProfile != null && activeProfile.variables != null) {
+         requestToUse = _interpolateRequest(request, activeProfile.variables!);
+       }
+    }
+
+    final curl = _generateCurl(requestToUse);
+    Clipboard.setData(ClipboardData(text: curl));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('cURL copied to clipboard')),
+    );
+  }
+
+  RequestModel _interpolateRequest(RequestModel original, List<EnvironmentVariable> env) {
+    final clone = RequestModel()
+      ..id = original.id
+      ..name = original.name
+      ..method = original.method
+      ..url = original.url
+      ..body = original.body
+      ..savedAt = original.savedAt;
+
+    if (original.headers != null) {
+      clone.headers = original.headers!
+          .map((h) => RequestHeader()
+            ..key = h.key
+            ..value = h.value)
+          .toList();
+    }
+
+    clone.url = _interpolateUrl(clone.url, env);
+
+    if (clone.headers != null) {
+      for (var header in clone.headers!) {
+        header.value = _interpolateString(header.value, env);
+      }
+    }
+
+    clone.body = _interpolateString(clone.body, env);
+
+    return clone;
+  }
+
+  String _interpolateUrl(String url, List<EnvironmentVariable> env) {
+    String result = url;
+    for (var variable in env) {
+      if (variable.key != null && variable.value != null) {
+        final key = variable.key!;
+        final value = variable.value!;
+        final encodedValue = Uri.encodeComponent(value);
+        
+        result = result.replaceAll('%7B%7B$key%7D%7D', encodedValue);
+        result = result.replaceAll('%7b%7b$key%7d%7d', encodedValue);
+        
+        result = result.replaceAll('{{$key}}', encodedValue);
+      }
+    }
+    return result;
+  }
+
+  String _interpolateString(String? text, List<EnvironmentVariable> env) {
+    if (text == null) return '';
+    String result = text;
+    for (var variable in env) {
+      if (variable.key != null && variable.value != null) {
+        final key = variable.key!;
+        final value = variable.value!;
+        
+        result = result.replaceAll('{{$key}}', value);
+        
+        final encodedValue = Uri.encodeComponent(value);
+        result = result.replaceAll('%7B%7B$key%7D%7D', encodedValue);
+        result = result.replaceAll('%7b%7b$key%7d%7d', encodedValue);
+      }
+    }
+    return result;
+  }
+
+  String _generateCurl(RequestModel request) {
+    final buffer = StringBuffer();
+    buffer.write('curl --location --request ${request.method} \'${request.url}\'');
+
+    if (request.headers != null) {
+      for (var header in request.headers!) {
+        if (header.key != null && header.key!.isNotEmpty) {
+          buffer.write(' \\\n--header \'${header.key}: ${header.value ?? ''}\'');
+        }
+      }
+    }
+
+    if (request.body != null && request.body!.isNotEmpty) {
+      // Escape single quotes in body
+      final escapedBody = request.body!.replaceAll('\'', '\'\\\'\'');
+      buffer.write(' \\\n--data-raw \'$escapedBody\'');
+    }
+
+    return buffer.toString();
   }
 
   // --- Dialogs ---
