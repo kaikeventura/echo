@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -80,6 +81,14 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     super.dispose();
   }
 
+  bool _areListsEqual(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   void _updateCodeControllers(RequestModel activeRequest) {
     final collections = ref.read(collectionsProvider).valueOrNull ?? [];
     final parentCollection = collections.firstWhere(
@@ -87,25 +96,29 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       orElse: () => CollectionModel(),
     );
 
-    _currentEnvKeys = [];
+    List<String> newEnvKeys = [];
     if (parentCollection.id != 0) {
       parentCollection.activeEnvironment.loadSync();
       final activeProfile = parentCollection.activeEnvironment.value;
       if (activeProfile != null) {
         activeProfile.variables?.forEach((v) {
-          if (v.key != null) _currentEnvKeys.add(v.key!);
+          if (v.key != null) newEnvKeys.add(v.key!);
         });
       }
     }
     
-    final oldUrlSelection = _urlController?.selection;
-    final oldBodySelection = _bodyController?.selection;
+    bool envKeysChanged = !_areListsEqual(_currentEnvKeys, newEnvKeys);
+    _currentEnvKeys = newEnvKeys;
     
-    _urlController?.dispose();
-    _bodyController?.dispose();
+    // Update URL Controller
+    if (_urlController == null || envKeysChanged || _urlController!.text != activeRequest.url) {
+      final oldUrlSelection = _urlController?.selection;
+      _urlController?.dispose();
+      _urlController = _createCodeController(activeRequest.url, _currentEnvKeys);
+      _urlController?.addListener(_handleAutocomplete);
+      if (oldUrlSelection != null) _urlController?.selection = oldUrlSelection;
+    }
 
-    _urlController = _createCodeController(activeRequest.url, _currentEnvKeys);
-    
     // Determine language for body controller
     final contentType = _getCurrentContentType(activeRequest);
     dynamic language;
@@ -115,16 +128,33 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       language = highlight_xml.xml;
     }
 
-    _bodyController = _createCodeController(
-      activeRequest.body ?? '', 
-      _currentEnvKeys,
-      language: language,
-    );
-    
-    _addListeners();
-    
-    if (oldUrlSelection != null) _urlController?.selection = oldUrlSelection;
-    if (oldBodySelection != null) _bodyController?.selection = oldBodySelection;
+    // Update Body Controller
+    // Check if language changed
+    bool languageChanged = _bodyController?.language != language;
+
+    if (_bodyController == null || 
+        envKeysChanged || 
+        _bodyController!.text != (activeRequest.body ?? '') ||
+        languageChanged) {
+      
+      // Optimization: If only language changed and text/envKeys are same, just update language
+      if (_bodyController != null && 
+          !envKeysChanged && 
+          _bodyController!.text == (activeRequest.body ?? '')) {
+         _bodyController!.language = language;
+      } else {
+         // Full recreate
+         final oldBodySelection = _bodyController?.selection;
+         _bodyController?.dispose();
+         _bodyController = _createCodeController(
+           activeRequest.body ?? '', 
+           _currentEnvKeys,
+           language: language,
+         );
+         _bodyController?.addListener(_handleAutocomplete);
+         if (oldBodySelection != null) _bodyController?.selection = oldBodySelection;
+      }
+    }
   }
 
   void _clearCodeControllers() {
@@ -150,6 +180,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       text: text,
       patternMap: patternMap,
       language: language,
+      modifiers: const [],
     );
   }
   
@@ -271,11 +302,32 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     }
 
     if (_urlController?.text != activeRequest.url) {
-       _urlController?.text = activeRequest.url;
+       // Only update if significantly different to avoid loop, 
+       // but _updateCodeControllers handles the main logic.
+       // This check is for when activeRequest changes from other sources not caught by listeners
+       if (_urlController == null) {
+          _urlController = _createCodeController(activeRequest.url, _currentEnvKeys);
+          _urlController?.addListener(_handleAutocomplete);
+       } else if (_urlController!.text != activeRequest.url) {
+          _urlController!.text = activeRequest.url;
+       }
     }
     
     if (_bodyController?.text != (activeRequest.body ?? '')) {
-      _bodyController?.text = activeRequest.body ?? '';
+       if (_bodyController == null) {
+          // Should be handled by _updateCodeControllers but just in case
+          final contentType = _getCurrentContentType(activeRequest);
+          dynamic language;
+          if (contentType == 'JSON') {
+            language = highlight_json.json;
+          } else if (contentType == 'XML') {
+            language = highlight_xml.xml;
+          }
+          _bodyController = _createCodeController(activeRequest.body ?? '', _currentEnvKeys, language: language);
+          _bodyController?.addListener(_handleAutocomplete);
+       } else if (_bodyController!.text != (activeRequest.body ?? '')) {
+          _bodyController!.text = activeRequest.body ?? '';
+       }
     }
 
     return Column(
