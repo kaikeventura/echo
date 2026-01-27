@@ -2,11 +2,28 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:code_text_field/code_text_field.dart';
+import 'package:highlight/languages/json.dart' as highlight_json;
+import 'package:highlight/languages/xml.dart' as highlight_xml;
+import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import '../../../providers/request_execution_provider.dart';
 import '../../../utils/http_colors.dart';
 
-class ResponsePanelWidget extends ConsumerWidget {
+class ResponsePanelWidget extends ConsumerStatefulWidget {
   const ResponsePanelWidget({super.key});
+
+  @override
+  ConsumerState<ResponsePanelWidget> createState() => _ResponsePanelWidgetState();
+}
+
+class _ResponsePanelWidgetState extends ConsumerState<ResponsePanelWidget> {
+  CodeController? _codeController;
+
+  @override
+  void dispose() {
+    _codeController?.dispose();
+    super.dispose();
+  }
 
   String _tryFormatJson(String text) {
     try {
@@ -18,30 +35,91 @@ class ResponsePanelWidget extends ConsumerWidget {
     }
   }
 
+  String _tryFormatXml(String text) {
+    try {
+      var xml = text.trim();
+      xml = xml.replaceAll(RegExp(r'>\s+<'), '><');
+      var indent = 0;
+      var result = StringBuffer();
+      for (var i = 0; i < xml.length; i++) {
+        var char = xml[i];
+        if (char == '<') {
+          if (i + 1 < xml.length && xml[i + 1] == '/') {
+            indent--;
+            if (indent < 0) indent = 0;
+            result.write('\n${'  ' * indent}');
+          } else {
+             if (result.isNotEmpty) result.write('\n${'  ' * indent}');
+             indent++;
+          }
+        }
+        result.write(char);
+        if (char == '>') {
+           if (i - 1 >= 0 && xml[i - 1] == '/') {
+             indent--;
+           }
+        }
+      }
+      return result.toString().trim();
+    } catch (e) {
+      return text;
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final executionState = ref.watch(requestExecutionProvider);
 
     return executionState.when(
       data: (response) {
         if (response == null) {
           return Center(
-            child: Text(
-              'Ready to send request',
-              style: GoogleFonts.inter(color: Colors.white24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.send_outlined, size: 48, color: Colors.white10),
+                const SizedBox(height: 16),
+                Text(
+                  'Ready to send request',
+                  style: GoogleFonts.inter(color: Colors.white24),
+                ),
+              ],
             ),
           );
         }
 
         String displayBody = response.body.toString();
-        displayBody = _tryFormatJson(displayBody);
+        String language = 'plaintext';
+
+        // Detect content type and format
+        final contentType = response.headers['content-type']?.firstOrNull?.toLowerCase() ?? '';
+        if (contentType.contains('json')) {
+          displayBody = _tryFormatJson(displayBody);
+          language = 'json';
+        } else if (contentType.contains('xml')) {
+          displayBody = _tryFormatXml(displayBody);
+          language = 'xml';
+        }
+
+        // Update controller if needed
+        if (_codeController?.text != displayBody) {
+          _codeController?.dispose();
+          _codeController = CodeController(
+            text: displayBody,
+            language: language == 'json' ? highlight_json.json : (language == 'xml' ? highlight_xml.xml : null),
+          );
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Status Bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: const Color(0xFF252526),
+              decoration: const BoxDecoration(
+                color: Color(0xFF252526),
+                border: Border(bottom: BorderSide(color: Colors.white10)),
+              ),
               child: Row(
                 children: [
                   _buildStatusBadge(response.statusCode),
@@ -49,18 +127,38 @@ class ResponsePanelWidget extends ConsumerWidget {
                   _buildMetric(Icons.timer_outlined, '${response.executionTimeMs}ms'),
                   const SizedBox(width: 24),
                   _buildMetric(Icons.data_usage, '${response.responseSizeBytes} B'),
+                  const Spacer(),
+                  if (language != 'plaintext')
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white10,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        language.toUpperCase(),
+                        style: GoogleFonts.inter(fontSize: 10, color: Colors.white54),
+                      ),
+                    ),
                 ],
               ),
             ),
+            
+            // Response Body
             Expanded(
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
                 color: const Color(0xFF1E1E1E),
                 child: SingleChildScrollView(
-                  child: SelectableText(
-                    displayBody,
-                    style: GoogleFonts.jetBrainsMono(fontSize: 12, height: 1.5),
+                  child: CodeTheme(
+                    data: CodeThemeData(styles: atomOneDarkTheme),
+                    child: CodeField(
+                      controller: _codeController!,
+                      textStyle: GoogleFonts.jetBrainsMono(fontSize: 13, height: 1.5),
+                      readOnly: true,
+                      // Removed gutterStyle as it's not supported in this version
+                      background: const Color(0xFF1E1E1E),
+                    ),
                   ),
                 ),
               ),
@@ -69,7 +167,28 @@ class ResponsePanelWidget extends ConsumerWidget {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red))),
+      error: (err, stack) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+              const SizedBox(height: 16),
+              Text(
+                'Request Failed',
+                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.redAccent),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                err.toString(),
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(color: Colors.white70),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -78,14 +197,15 @@ class ResponsePanelWidget extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(
         children: [
           Container(
-            width: 8,
-            height: 8,
+            width: 6,
+            height: 6,
             decoration: BoxDecoration(
               color: color,
               shape: BoxShape.circle,
@@ -108,7 +228,7 @@ class ResponsePanelWidget extends ConsumerWidget {
   Widget _buildMetric(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, size: 14, color: Colors.white54),
+        Icon(icon, size: 14, color: Colors.white38),
         const SizedBox(width: 6),
         Text(
           text,
