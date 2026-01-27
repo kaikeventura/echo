@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'export_collection_dialog.dart';
+import 'import_collection_dialog.dart';
 
 class HoverMenuButton extends StatefulWidget {
   final String title;
@@ -164,6 +165,11 @@ class TopMenuBar extends StatelessWidget {
               showDialog(
                 context: context,
                 builder: (context) => const ExportCollectionDialog(),
+              );
+            } else if (value == 'import') {
+              showDialog(
+                context: context,
+                builder: (context) => const ImportCollectionDialog(),
               );
             } else {
               print('Selected: $value');

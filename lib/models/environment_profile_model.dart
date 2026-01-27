@@ -12,10 +12,23 @@ class EnvironmentProfile {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id, // Manter o ID para possível uso na importação
+      'id': id,
       'name': name,
       'variables': variables?.map((v) => v.toJson()).toList(),
     };
+  }
+
+  static EnvironmentProfile fromJson(Map<String, dynamic> json) {
+    final profile = EnvironmentProfile()
+      ..name = json['name'] as String;
+
+    if (json['variables'] != null) {
+      profile.variables = (json['variables'] as List)
+          .map((v) => EnvironmentVariable.fromJson(v as Map<String, dynamic>))
+          .toList();
+    }
+
+    return profile;
   }
 }
 
@@ -29,5 +42,11 @@ class EnvironmentVariable {
       'key': key,
       'value': value,
     };
+  }
+
+  static EnvironmentVariable fromJson(Map<String, dynamic> json) {
+    return EnvironmentVariable()
+      ..key = json['key'] as String?
+      ..value = json['value'] as String?;
   }
 }

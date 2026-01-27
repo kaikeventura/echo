@@ -19,7 +19,6 @@ class CollectionModel {
   final environmentProfiles = IsarLinks<EnvironmentProfile>();
 
   Future<Map<String, dynamic>> toJson() async {
-    // Carrega os dados dos IsarLinks antes de serializar
     await requests.load();
     await environmentProfiles.load();
     await activeEnvironment.load();
@@ -29,7 +28,12 @@ class CollectionModel {
       'name': name,
       'requests': requests.map((r) => r.toJson()).toList(),
       'environmentProfiles': environmentProfiles.map((p) => p.toJson()).toList(),
-      'activeEnvironmentId': activeEnvironment.value?.id, // Salva apenas o ID do ambiente ativo
+      'activeEnvironmentId': activeEnvironment.value?.id,
     };
+  }
+
+  static CollectionModel fromJson(Map<String, dynamic> json) {
+    return CollectionModel()
+      ..name = json['name'] as String;
   }
 }

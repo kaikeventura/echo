@@ -1,0 +1,207 @@
+import 'dart:io';
+import 'package:echo/providers/collections_provider.dart';
+import 'package:echo/services/collection_importer.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class ImportCollectionDialog extends ConsumerStatefulWidget {
+  const ImportCollectionDialog({super.key});
+
+  @override
+  ConsumerState<ImportCollectionDialog> createState() => _ImportCollectionDialogState();
+}
+
+class _ImportCollectionDialogState extends ConsumerState<ImportCollectionDialog> {
+  String _selectedType = 'Echo Collection';
+  String? _selectedFilePath;
+  String? _fileName;
+  bool _isImporting = false;
+  String? _error;
+
+  final List<String> _importTypes = [
+    'Echo Collection',
+    // 'Postman Collection', // Futuro
+    // 'Insomnia Export', // Futuro
+  ];
+
+  Future<void> _pickFile() async {
+    setState(() {
+      _error = null;
+    });
+
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (result != null) {
+        setState(() {
+          _selectedFilePath = result.files.single.path;
+          _fileName = result.files.single.name;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Error picking file: $e';
+      });
+    }
+  }
+
+  Future<void> _import() async {
+    if (_selectedFilePath == null) return;
+
+    setState(() {
+      _isImporting = true;
+      _error = null;
+    });
+
+    try {
+      final file = File(_selectedFilePath!);
+      final content = await file.readAsString();
+
+      if (_selectedType == 'Echo Collection') {
+        final importer = CollectionImporter();
+        await importer.import(content);
+      } 
+      // else if (_selectedType == 'Postman') ...
+
+      // Atualiza a lista de coleções
+      ref.invalidate(collectionsProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Collection imported successfully!')),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Import failed: $e';
+        _isImporting = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Import Collection'),
+      backgroundColor: const Color(0xFF2D2D2D),
+      content: SizedBox(
+        width: 450,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Import From', style: GoogleFonts.inter(color: Colors.white70, fontSize: 12)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedType,
+                  isExpanded: true,
+                  dropdownColor: const Color(0xFF3D3D3D),
+                  items: _importTypes.map((type) {
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Text(type, style: GoogleFonts.inter(fontSize: 13)),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _selectedType = val);
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Select File', style: GoogleFonts.inter(color: Colors.white70, fontSize: 12)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Text(
+                      _fileName ?? 'No file selected',
+                      style: GoogleFonts.inter(
+                        color: _fileName != null ? Colors.white : Colors.white38,
+                        fontSize: 13,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _pickFile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.1),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                  ),
+                  child: const Text('Browse'),
+                ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.redAccent, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: GoogleFonts.inter(color: Colors.redAccent, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isImporting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: (_selectedFilePath == null || _isImporting) ? null : _import,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Colors.white,
+          ),
+          child: _isImporting 
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Import'),
+        ),
+      ],
+    );
+  }
+}

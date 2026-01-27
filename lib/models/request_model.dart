@@ -20,7 +20,7 @@ class RequestModel {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id, // Manter o ID para possível uso na importação (ex: para evitar duplicatas ou para referências)
+      'id': id,
       'name': name,
       'method': method,
       'url': url,
@@ -28,6 +28,23 @@ class RequestModel {
       'body': body,
       'savedAt': savedAt.toIso8601String(),
     };
+  }
+
+  static RequestModel fromJson(Map<String, dynamic> json) {
+    final request = RequestModel()
+      ..name = json['name'] as String
+      ..method = json['method'] as String
+      ..url = json['url'] as String
+      ..body = json['body'] as String?
+      ..savedAt = DateTime.parse(json['savedAt'] as String);
+
+    if (json['headers'] != null) {
+      request.headers = (json['headers'] as List)
+          .map((h) => RequestHeader.fromJson(h as Map<String, dynamic>))
+          .toList();
+    }
+
+    return request;
   }
 }
 
@@ -41,5 +58,11 @@ class RequestHeader {
       'key': key,
       'value': value,
     };
+  }
+
+  static RequestHeader fromJson(Map<String, dynamic> json) {
+    return RequestHeader()
+      ..key = json['key'] as String?
+      ..value = json['value'] as String?;
   }
 }
