@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../features/request/presentation/autocomplete_manager.dart';
 
 class KeyValueTable extends StatefulWidget {
   final Map<String, String> items;
+  final List<String> envKeys;
   final Function(String key, String value, String oldKey) onChanged;
   final Function(String key) onDeleted;
 
   const KeyValueTable({
     super.key,
     required this.items,
+    this.envKeys = const [],
     required this.onChanged,
     required this.onDeleted,
   });
@@ -64,6 +67,7 @@ class _KeyValueTableState extends State<KeyValueTable> {
                 key: ValueKey(entry.key), // Stable key based on map key
                 itemKey: entry.key,
                 itemValue: entry.value,
+                envKeys: widget.envKeys,
                 onChanged: widget.onChanged,
                 onDeleted: widget.onDeleted,
               );
@@ -151,6 +155,7 @@ class _KeyValueTableState extends State<KeyValueTable> {
 class _KeyValueRow extends StatefulWidget {
   final String itemKey;
   final String itemValue;
+  final List<String> envKeys;
   final Function(String key, String value, String oldKey) onChanged;
   final Function(String key) onDeleted;
 
@@ -158,6 +163,7 @@ class _KeyValueRow extends StatefulWidget {
     super.key,
     required this.itemKey,
     required this.itemValue,
+    this.envKeys = const [],
     required this.onChanged,
     required this.onDeleted,
   });
@@ -170,6 +176,9 @@ class _KeyValueRowState extends State<_KeyValueRow> {
   late TextEditingController _keyController;
   late TextEditingController _valueController;
   final FocusNode _keyFocusNode = FocusNode();
+  final FocusNode _valueFocusNode = FocusNode();
+  final AutocompleteManager _keyAutocomplete = AutocompleteManager();
+  final AutocompleteManager _valueAutocomplete = AutocompleteManager();
 
   @override
   void initState() {
@@ -177,29 +186,91 @@ class _KeyValueRowState extends State<_KeyValueRow> {
     _keyController = TextEditingController(text: widget.itemKey);
     _valueController = TextEditingController(text: widget.itemValue);
 
+    _keyController.addListener(() => _handleAutocomplete(_keyController, _keyFocusNode, _keyAutocomplete));
+    _valueController.addListener(() => _handleAutocomplete(_valueController, _valueFocusNode, _valueAutocomplete));
+
     // Save on blur for Key
-    _keyFocusNode.addListener(() {
+    _keyFocusNode.addListener(() async {
       if (!_keyFocusNode.hasFocus) {
+        // Delay hiding to allow tap on suggestion to register
+        await Future.delayed(const Duration(milliseconds: 200));
+        _keyAutocomplete.hide();
         if (_keyController.text != widget.itemKey) {
            widget.onChanged(_keyController.text, widget.itemValue, widget.itemKey);
         }
       }
     });
+
+    _valueFocusNode.addListener(() async {
+      if (!_valueFocusNode.hasFocus) {
+        // Delay hiding to allow tap on suggestion to register
+        await Future.delayed(const Duration(milliseconds: 200));
+        _valueAutocomplete.hide();
+        // Value is usually updated on change, but ensure consistency on blur
+        if (_valueController.text != widget.itemValue) {
+           widget.onChanged(widget.itemKey, _valueController.text, widget.itemKey);
+        }
+      }
+    });
+  }
+
+  void _handleAutocomplete(TextEditingController controller, FocusNode focusNode, AutocompleteManager manager) {
+    if (!focusNode.hasFocus) return;
+
+    final text = controller.text;
+    final selection = controller.selection;
+    if (!selection.isCollapsed || selection.baseOffset < 0 || selection.baseOffset > text.length) {
+      manager.hide();
+      return;
+    }
+
+    final beforeCursor = text.substring(0, selection.baseOffset);
+    final triggerIndex = beforeCursor.lastIndexOf('{{');
+
+    if (triggerIndex != -1) {
+      final afterTrigger = beforeCursor.substring(triggerIndex + 2);
+      if (!afterTrigger.contains('}}')) {
+        final partial = afterTrigger;
+        final suggestions = widget.envKeys
+            .where((key) => key.toLowerCase().startsWith(partial.toLowerCase()))
+            .toList();
+
+        if (suggestions.isNotEmpty) {
+          manager.showSuggestions(
+            context,
+            controller,
+            suggestions,
+            (selected) {
+              final newText = text.substring(0, triggerIndex) +
+                  '{{$selected}}' +
+                  text.substring(selection.baseOffset);
+              controller.text = newText;
+              controller.selection = TextSelection.fromPosition(
+                TextPosition(offset: triggerIndex + selected.length + 4),
+              );
+              
+              // Trigger update immediately for value
+              if (controller == _valueController) {
+                widget.onChanged(widget.itemKey, newText, widget.itemKey);
+              }
+              // For key, we wait for blur/submit to avoid row identity change issues
+            },
+          );
+          return;
+        }
+      }
+    }
+    manager.hide();
   }
 
   @override
   void didUpdateWidget(_KeyValueRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Only update text if it's different and NOT focused (to avoid overwriting user typing)
-    // But for Key, if it changed externally, we might want to update.
-    // Since we use ValueKey(entry.key), this widget is usually recreated if key changes.
-    // So this is mostly for Value updates.
     if (widget.itemValue != _valueController.text) {
-       // Check if we are editing it? 
-       // If we are editing value, we don't want to overwrite.
-       // But here we assume single user.
-       // Let's update it.
-       _valueController.text = widget.itemValue;
+       // Only update if not focused to avoid overwriting user input
+       if (!_valueFocusNode.hasFocus) {
+         _valueController.text = widget.itemValue;
+       }
     }
   }
 
@@ -208,6 +279,9 @@ class _KeyValueRowState extends State<_KeyValueRow> {
     _keyController.dispose();
     _valueController.dispose();
     _keyFocusNode.dispose();
+    _valueFocusNode.dispose();
+    _keyAutocomplete.hide();
+    _valueAutocomplete.hide();
     super.dispose();
   }
 
@@ -221,34 +295,40 @@ class _KeyValueRowState extends State<_KeyValueRow> {
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _keyController,
-              focusNode: _keyFocusNode,
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                isDense: true,
+            child: CompositedTransformTarget(
+              link: _keyAutocomplete.layerLink,
+              child: TextField(
+                controller: _keyController,
+                focusNode: _keyFocusNode,
+                style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  isDense: true,
+                ),
+                onSubmitted: (val) {
+                  if (val != widget.itemKey) {
+                    widget.onChanged(val, widget.itemValue, widget.itemKey);
+                  }
+                },
               ),
-              onSubmitted: (val) {
-                if (val != widget.itemKey) {
-                  widget.onChanged(val, widget.itemValue, widget.itemKey);
-                }
-              },
             ),
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: TextField(
-              controller: _valueController,
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white70),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                isDense: true,
+            child: CompositedTransformTarget(
+              link: _valueAutocomplete.layerLink,
+              child: TextField(
+                controller: _valueController,
+                focusNode: _valueFocusNode,
+                style: GoogleFonts.inter(fontSize: 13, color: Colors.white70),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  isDense: true,
+                ),
+                onChanged: (val) {
+                  widget.onChanged(widget.itemKey, val, widget.itemKey);
+                },
               ),
-              onChanged: (val) {
-                // For value, we can update immediately as it doesn't change row identity
-                widget.onChanged(widget.itemKey, val, widget.itemKey);
-              },
             ),
           ),
           IconButton(

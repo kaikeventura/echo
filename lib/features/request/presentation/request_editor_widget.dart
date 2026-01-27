@@ -490,6 +490,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     return KeyValueTable(
       items: params,
+      envKeys: _currentEnvKeys,
       onChanged: (key, value, oldKey) {
         final currentParams = Map<String, String>.from(params);
         if (oldKey.isNotEmpty && oldKey != key) {
@@ -520,6 +521,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     return KeyValueTable(
       items: headersMap,
+      envKeys: _currentEnvKeys,
       onChanged: (key, value, oldKey) {
         final newHeaders = request.headers != null 
             ? List<RequestHeader>.from(request.headers!) 
@@ -664,6 +666,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     return KeyValueTable(
       items: formData,
+      envKeys: _currentEnvKeys,
       onChanged: (key, value, oldKey) {
         final currentData = Map<String, String>.from(formData);
         
