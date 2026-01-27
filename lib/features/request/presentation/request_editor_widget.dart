@@ -89,7 +89,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     return true;
   }
 
-  CollectionModel _findParentCollection(List<CollectionModel> collections, RequestModel request) {
+  CollectionModel? _findParentCollection(List<CollectionModel> collections, RequestModel request) {
     for (var col in collections) {
       // Check root requests
       if (col.requests.any((r) => r.id == request.id)) {
@@ -102,7 +102,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
         }
       }
     }
-    return CollectionModel(); // Not found
+    return null; // Not found
   }
 
   void _updateCodeControllers(RequestModel activeRequest) {
@@ -110,13 +110,19 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     final parentCollection = _findParentCollection(collections, activeRequest);
 
     List<String> newEnvKeys = [];
-    if (parentCollection.id != 0) {
-      parentCollection.activeEnvironment.loadSync();
-      final activeProfile = parentCollection.activeEnvironment.value;
-      if (activeProfile != null) {
-        activeProfile.variables?.forEach((v) {
-          if (v.key != null) newEnvKeys.add(v.key!);
-        });
+    if (parentCollection != null) {
+      // Só tenta carregar se a coleção foi encontrada e é gerenciada pelo Isar
+      try {
+        parentCollection.activeEnvironment.loadSync();
+        final activeProfile = parentCollection.activeEnvironment.value;
+        if (activeProfile != null) {
+          activeProfile.variables?.forEach((v) {
+            if (v.key != null) newEnvKeys.add(v.key!);
+          });
+        }
+      } catch (e) {
+        // Ignora erros de carregamento se o objeto não estiver anexado (embora _findParentCollection deva retornar apenas objetos gerenciados)
+        print('Error loading environment: $e');
       }
     }
     
@@ -408,10 +414,15 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     final collections = ref.watch(collectionsProvider).valueOrNull ?? [];
     final parentCollection = _findParentCollection(collections, request);
     
-    if (parentCollection.id != 0) {
-      parentCollection.activeEnvironment.loadSync();
+    EnvironmentProfile? activeProfile;
+    if (parentCollection != null) {
+      try {
+        parentCollection.activeEnvironment.loadSync();
+        activeProfile = parentCollection.activeEnvironment.value;
+      } catch (e) {
+        // Ignore
+      }
     }
-    final activeProfile = parentCollection.activeEnvironment.value;
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -957,7 +968,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     final collections = ref.read(collectionsProvider).valueOrNull ?? [];
     final parentCollection = _findParentCollection(collections, activeRequest);
 
-    if (parentCollection.id == 0) return; // Not found
+    if (parentCollection == null || parentCollection.id == 0) return; // Not found
 
     await showDialog(
       context: context,
