@@ -106,6 +106,14 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     if (oldBodySelection != null) _bodyController?.selection = oldBodySelection;
   }
 
+  void _clearCodeControllers() {
+    _urlController?.dispose();
+    _bodyController?.dispose();
+    _urlController = _createCodeController('', []);
+    _bodyController = _createCodeController('', []);
+    _addListeners();
+  }
+
   CodeController _createCodeController(String text, List<String> envKeys) {
     final patternMap = LinkedHashMap<String, TextStyle>();
 
@@ -194,6 +202,26 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   Widget build(BuildContext context) {
     final activeRequest = ref.watch(activeRequestProvider);
 
+    ref.listen(collectionsProvider, (previous, next) {
+       if (activeRequest != null) {
+         setState(() {
+           _updateCodeControllers(activeRequest);
+         });
+       }
+    });
+
+    ref.listen(activeRequestProvider, (previous, next) {
+      if (previous?.id != next?.id) {
+        setState(() {
+          if (next != null) {
+            _updateCodeControllers(next);
+          } else {
+            _clearCodeControllers();
+          }
+        });
+      }
+    });
+
     if (activeRequest == null) {
       return Center(
         child: Column(
@@ -209,22 +237,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
         ),
       );
     }
-
-    ref.listen(collectionsProvider, (previous, next) {
-       if (activeRequest != null) {
-         setState(() {
-           _updateCodeControllers(activeRequest);
-         });
-       }
-    });
-
-    ref.listen(activeRequestProvider, (previous, next) {
-      if (previous?.id != next?.id) {
-        setState(() {
-          _updateCodeControllers(next!);
-        });
-      }
-    });
 
     if (_urlController?.text != activeRequest.url) {
        _urlController?.text = activeRequest.url;
