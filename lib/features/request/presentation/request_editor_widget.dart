@@ -32,7 +32,8 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   final FocusNode _urlFocusNode = FocusNode();
   final FocusNode _bodyFocusNode = FocusNode();
 
-  final AutocompleteManager _autocompleteManager = AutocompleteManager();
+  final AutocompleteManager _urlAutocompleteManager = AutocompleteManager();
+  final AutocompleteManager _bodyAutocompleteManager = AutocompleteManager();
   List<String> _currentEnvKeys = [];
 
   // Estado de validação
@@ -71,6 +72,8 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     _bodyController?.dispose();
     _urlFocusNode.dispose();
     _bodyFocusNode.dispose();
+    _urlAutocompleteManager.hide(); // Ensure overlay is removed
+    _bodyAutocompleteManager.hide(); // Ensure overlay is removed
     super.dispose();
   }
 
@@ -133,22 +136,32 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   
   void _handleAutocomplete() {
     CodeController? controller;
+    AutocompleteManager? currentAutocompleteManager;
     
     if (_urlFocusNode.hasFocus) {
       controller = _urlController;
+      currentAutocompleteManager = _urlAutocompleteManager;
+      _bodyAutocompleteManager.hide(); // Hide other autocomplete if switching focus
     } else if (_bodyFocusNode.hasFocus) {
       controller = _bodyController;
+      currentAutocompleteManager = _bodyAutocompleteManager;
+      _urlAutocompleteManager.hide(); // Hide other autocomplete if switching focus
+    } else {
+      _urlAutocompleteManager.hide(); // Hide all if no relevant focus
+      _bodyAutocompleteManager.hide();
+      return;
     }
 
-    if (controller == null) {
-      _autocompleteManager.hide();
+    if (controller == null || currentAutocompleteManager == null) {
+      _urlAutocompleteManager.hide();
+      _bodyAutocompleteManager.hide();
       return;
     }
 
     final text = controller.text;
     final selection = controller.selection;
     if (!selection.isCollapsed || selection.baseOffset < 0 || selection.baseOffset > text.length) {
-      _autocompleteManager.hide();
+      currentAutocompleteManager.hide();
       return;
     }
 
@@ -166,7 +179,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             .toList();
 
         if (suggestions.isNotEmpty) {
-          _autocompleteManager.showSuggestions(
+          currentAutocompleteManager.showSuggestions(
             context,
             controller,
             suggestions,
@@ -195,7 +208,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       }
     }
     
-    _autocompleteManager.hide();
+    currentAutocompleteManager.hide();
   }
 
   @override
@@ -357,7 +370,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           const SizedBox(width: 16),
           Expanded(
             child: CompositedTransformTarget(
-              link: _autocompleteManager.layerLink,
+              link: _urlAutocompleteManager.layerLink,
               child: CodeField(
                 controller: _urlController!,
                 focusNode: _urlFocusNode,
@@ -685,7 +698,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: CompositedTransformTarget(
-        link: _autocompleteManager.layerLink,
+        link: _bodyAutocompleteManager.layerLink,
         child: CodeField(
           controller: _bodyController!,
           focusNode: _bodyFocusNode,
@@ -722,6 +735,9 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   void _updateContentType(RequestModel request, String mimeType) {
+    _urlAutocompleteManager.hide(); // Hide any active autocomplete
+    _bodyAutocompleteManager.hide(); // Hide any active autocomplete
+
     final newHeaders = request.headers != null 
         ? List<RequestHeader>.from(request.headers!) 
         : <RequestHeader>[];
