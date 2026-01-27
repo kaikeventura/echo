@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:isar/isar.dart';
 import 'package:code_text_field/code_text_field.dart';
+import 'package:highlight/languages/json.dart' as highlight_json;
+import 'package:highlight/languages/xml.dart' as highlight_xml;
+import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import '../../../models/collection_model.dart';
 import '../../../models/environment_profile_model.dart';
 import '../../../models/request_model.dart';
@@ -102,7 +105,22 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     _bodyController?.dispose();
 
     _urlController = _createCodeController(activeRequest.url, _currentEnvKeys);
-    _bodyController = _createCodeController(activeRequest.body ?? '', _currentEnvKeys);
+    
+    // Determine language for body controller
+    final contentType = _getCurrentContentType(activeRequest);
+    dynamic language;
+    if (contentType == 'JSON') {
+      language = highlight_json.json;
+    } else if (contentType == 'XML') {
+      language = highlight_xml.xml;
+    }
+
+    _bodyController = _createCodeController(
+      activeRequest.body ?? '', 
+      _currentEnvKeys,
+      language: language,
+    );
+    
     _addListeners();
     
     if (oldUrlSelection != null) _urlController?.selection = oldUrlSelection;
@@ -117,7 +135,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     _addListeners();
   }
 
-  CodeController _createCodeController(String text, List<String> envKeys) {
+  CodeController _createCodeController(String text, List<String> envKeys, {dynamic language}) {
     final patternMap = LinkedHashMap<String, TextStyle>();
 
     if (envKeys.isNotEmpty) {
@@ -131,6 +149,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     return CodeController(
       text: text,
       patternMap: patternMap,
+      language: language,
     );
   }
   
@@ -693,24 +712,29 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   Widget _buildCodeEditor(RequestModel request, String type) {
-    String hint = '';
-    if (type == 'JSON') hint = '{\n  "key": "value"\n}';
-    else if (type == 'XML') hint = '<root>\n  <key>value</key>\n</root>';
-    else hint = 'Enter text content here...';
-
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: CompositedTransformTarget(
         link: _bodyAutocompleteManager.layerLink,
-        child: CodeField(
-          controller: _bodyController!,
-          focusNode: _bodyFocusNode,
-          textStyle: GoogleFonts.jetBrainsMono(fontSize: 13, height: 1.5),
-          onChanged: (val) {
-            request.body = val;
-            _validateBody(val, type);
-            _saveRequest(request);
-          },
+        child: CodeTheme(
+          data: CodeThemeData(styles: atomOneDarkTheme),
+          child: CodeField(
+            controller: _bodyController!,
+            focusNode: _bodyFocusNode,
+            textStyle: GoogleFonts.jetBrainsMono(fontSize: 13, height: 1.5),
+            lineNumbers: true,
+            lineNumberStyle: const LineNumberStyle(
+              textStyle: TextStyle(color: Colors.white24, fontSize: 12),
+              width: 48,
+              margin: 0,
+            ),
+            background: const Color(0xFF1E1E1E),
+            onChanged: (val) {
+              request.body = val;
+              _validateBody(val, type);
+              _saveRequest(request);
+            },
+          ),
         ),
       ),
     );
@@ -764,6 +788,9 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     request.headers = newHeaders;
     _saveRequest(request);
+    
+    // Update controller language
+    _updateCodeControllers(request);
   }
 
   void _validateBody(String text, String type) {
