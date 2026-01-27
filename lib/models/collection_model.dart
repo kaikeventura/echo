@@ -17,4 +17,19 @@ class CollectionModel {
 
   // Lista de todos os perfis de ambiente disponíveis para esta coleção
   final environmentProfiles = IsarLinks<EnvironmentProfile>();
+
+  Future<Map<String, dynamic>> toJson() async {
+    // Carrega os dados dos IsarLinks antes de serializar
+    await requests.load();
+    await environmentProfiles.load();
+    await activeEnvironment.load();
+
+    return {
+      'id': id,
+      'name': name,
+      'requests': requests.map((r) => r.toJson()).toList(),
+      'environmentProfiles': environmentProfiles.map((p) => p.toJson()).toList(),
+      'activeEnvironmentId': activeEnvironment.value?.id, // Salva apenas o ID do ambiente ativo
+    };
+  }
 }

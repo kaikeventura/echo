@@ -6,12 +6,16 @@
 
 #include "generated_plugin_registrant.h"
 
+#include <file_saver/file_saver_plugin.h>
 #include <flutter_acrylic/flutter_acrylic_plugin.h>
 #include <isar_flutter_libs/isar_flutter_libs_plugin.h>
 #include <screen_retriever/screen_retriever_plugin.h>
 #include <window_manager/window_manager_plugin.h>
 
 void fl_register_plugins(FlPluginRegistry* registry) {
+  g_autoptr(FlPluginRegistrar) file_saver_registrar =
+      fl_plugin_registry_get_registrar_for_plugin(registry, "FileSaverPlugin");
+  file_saver_plugin_register_with_registrar(file_saver_registrar);
   g_autoptr(FlPluginRegistrar) flutter_acrylic_registrar =
       fl_plugin_registry_get_registrar_for_plugin(registry, "FlutterAcrylicPlugin");
   flutter_acrylic_plugin_register_with_registrar(flutter_acrylic_registrar);
