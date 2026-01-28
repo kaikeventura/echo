@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:window_manager/window_manager.dart';
 import 'about_dialog.dart';
 import '../../settings/presentation/settings_dialog.dart';
+import 'dialogs.dart';
 
 class HoverMenuButton extends StatefulWidget {
   final String title;
@@ -146,26 +149,35 @@ class _HoverMenuButtonState extends State<HoverMenuButton> {
   }
 }
 
-class TopMenuBar extends StatelessWidget {
+class TopMenuBar extends ConsumerWidget {
   const TopMenuBar({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Row(
       children: [
         HoverMenuButton(
           title: 'File',
           items: [
+            const PopupMenuItem(value: 'new_collection', child: Text('New Collection')),
+            const PopupMenuItem(value: 'new_request', child: Text('New Request')),
+            const PopupMenuDivider(),
             const PopupMenuItem(value: 'settings', child: Text('Settings')),
+            const PopupMenuDivider(),
+            const PopupMenuItem(value: 'exit', child: Text('Exit', style: TextStyle(color: Colors.redAccent))),
           ],
           onSelected: (value) {
-            if (value == 'settings') {
+            if (value == 'new_collection') {
+              HomeDialogs.showCreateCollectionDialog(context, ref);
+            } else if (value == 'new_request') {
+              HomeDialogs.showCreateRequestDialog(context, ref);
+            } else if (value == 'settings') {
               showDialog(
                 context: context,
                 builder: (context) => const SettingsDialog(),
               );
-            } else {
-              print('Selected: $value');
+            } else if (value == 'exit') {
+              windowManager.close();
             }
           },
         ),
