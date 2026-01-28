@@ -149,7 +149,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           case 0:
             return _buildGeneralTab(settings);
           case 1:
-            return const Center(child: Text('Editor Settings (Coming Soon)'));
+            return _buildEditorTab(settings); // Nova aba
           case 2:
             return _buildNetworkTab(settings);
           case 3:
@@ -192,6 +192,58 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
               if (newMode != null) {
                 ref.read(settingsProvider.notifier).updateThemeMode(newMode);
               }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEditorTab(AppSettingsModel settings) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Editor',
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 24),
+        
+        // Font Size
+        _buildSettingRow(
+          label: 'Font Size: ${settings.editorFontSize.toInt()}px',
+          description: 'Adjust the font size of the code editor',
+          child: SizedBox(
+            width: 200,
+            child: Slider(
+              value: settings.editorFontSize,
+              min: 10.0,
+              max: 24.0,
+              divisions: 14,
+              activeColor: Theme.of(context).colorScheme.primary,
+              label: settings.editorFontSize.round().toString(),
+              onChanged: (val) {
+                ref.read(settingsProvider.notifier).updateEditorSettings(fontSize: val);
+              },
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // Word Wrap
+        _buildSettingRow(
+          label: 'Word Wrap',
+          description: 'Wrap long lines in the editor',
+          child: Switch(
+            value: settings.editorWordWrap,
+            activeColor: Theme.of(context).colorScheme.primary,
+            onChanged: (val) {
+              ref.read(settingsProvider.notifier).updateEditorSettings(wordWrap: val);
             },
           ),
         ),
