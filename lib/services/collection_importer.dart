@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:echo/models/collection_model.dart';
 import 'package:echo/models/environment_profile_model.dart';
 import 'package:echo/models/request_model.dart';
+import 'package:echo/models/folder_model.dart';
 import 'package:echo/services/isar_service.dart';
 import 'package:isar/isar.dart';
 
@@ -21,12 +22,10 @@ class CollectionImporter {
       for (var colData in collectionsData) {
         // 1. Criar a Coleção
         final collection = CollectionModel.fromJson(colData);
-        // O ID será auto-incrementado pelo Isar ao salvar, pois inicializamos com Isar.autoIncrement no modelo
-        // Mas para garantir, podemos forçar se o fromJson tiver sobrescrito
         collection.id = Isar.autoIncrement; 
         await isar.collectionModels.put(collection);
 
-        // 2. Criar e Vincular Requests
+        // 2. Criar e Vincular Requests da Raiz
         if (colData['requests'] != null) {
           for (var reqData in colData['requests']) {
             final request = RequestModel.fromJson(reqData);
@@ -37,7 +36,29 @@ class CollectionImporter {
           await collection.requests.save();
         }
 
-        // 3. Criar e Vincular Environments
+        // 3. Criar e Vincular Pastas e seus Requests
+        if (colData['folders'] != null) {
+          for (var folderData in colData['folders']) {
+            final folder = FolderModel.fromJson(folderData);
+            folder.id = Isar.autoIncrement; // Novo ID
+            await isar.folderModels.put(folder);
+            collection.folders.add(folder);
+
+            // Requests dentro da pasta
+            if (folderData['requests'] != null) {
+              for (var reqData in folderData['requests']) {
+                final request = RequestModel.fromJson(reqData);
+                request.id = Isar.autoIncrement; // Novo ID
+                await isar.requestModels.put(request);
+                folder.requests.add(request);
+              }
+              await folder.requests.save();
+            }
+          }
+          await collection.folders.save();
+        }
+
+        // 4. Criar e Vincular Environments
         if (colData['environmentProfiles'] != null) {
           for (var envData in colData['environmentProfiles']) {
             final envProfile = EnvironmentProfile.fromJson(envData);

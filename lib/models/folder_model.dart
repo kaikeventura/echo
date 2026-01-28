@@ -15,4 +15,9 @@ class FolderModel {
 
   // Coleção pai
   final collection = IsarLink<CollectionModel>();
+
+  static FolderModel fromJson(Map<String, dynamic> json) {
+    return FolderModel()
+      ..name = json['name'] as String;
+  }
 }

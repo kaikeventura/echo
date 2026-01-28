@@ -1,3 +1,4 @@
+import 'dart:convert'; // Importar dart:convert para utf8
 import 'dart:typed_data';
 import 'package:echo/providers/collections_provider.dart';
 import 'package:flutter/material.dart';
@@ -31,9 +32,16 @@ class ExportCollectionDialog extends ConsumerWidget {
               itemCount: collections.length,
               itemBuilder: (context, index) {
                 final collection = collections[index];
+                
+                // Calcular total de requests (raiz + pastas)
+                int totalRequests = collection.requests.length;
+                for (var folder in collection.folders) {
+                  totalRequests += folder.requests.length;
+                }
+
                 return ListTile(
                   title: Text(collection.name),
-                  subtitle: Text('${collection.requests.length} requests'),
+                  subtitle: Text('$totalRequests requests'),
                   trailing: ElevatedButton(
                     onPressed: () async {
                       // 1. Exportar a coleção para JSON
@@ -55,12 +63,14 @@ class ExportCollectionDialog extends ConsumerWidget {
 
                       // 3. Salvar o arquivo usando file_saver
                       try {
+                        // Usar utf8.encode para garantir suporte a caracteres especiais
+                        final bytes = Uint8List.fromList(utf8.encode(jsonContent));
+
                         final String? filePath = await FileSaver.instance.saveFile(
                           name: fileName,
                           ext: 'json',
-                          bytes: Uint8List.fromList(jsonContent.codeUnits),
+                          bytes: bytes,
                           mimeType: MimeType.json,
-                          // saveAs: true, // Removido pois está causando erro de build
                         );
 
                         if (filePath != null) {
