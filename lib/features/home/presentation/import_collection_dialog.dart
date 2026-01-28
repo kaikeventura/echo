@@ -1,6 +1,9 @@
 import 'dart:io';
+import 'package:echo/features/postman/importer.dart';
 import 'package:echo/providers/collections_provider.dart';
 import 'package:echo/services/collection_importer.dart';
+import 'package:echo/services/collection_service.dart';
+import 'package:echo/services/isar_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,8 +25,7 @@ class _ImportCollectionDialogState extends ConsumerState<ImportCollectionDialog>
 
   final List<String> _importTypes = [
     'Echo Collection',
-    // 'Postman Collection', // Futuro
-    // 'Insomnia Export', // Futuro
+    'Postman Collection',
   ];
 
   Future<void> _pickFile() async {
@@ -61,12 +63,17 @@ class _ImportCollectionDialogState extends ConsumerState<ImportCollectionDialog>
     try {
       final file = File(_selectedFilePath!);
       final content = await file.readAsString();
+      final isar = await IsarService().db;
 
       if (_selectedType == 'Echo Collection') {
         final importer = CollectionImporter();
         await importer.import(content);
-      } 
-      // else if (_selectedType == 'Postman') ...
+      } else if (_selectedType == 'Postman Collection') {
+        final importer = PostmanImporter();
+        final collection = importer.import(content);
+        final collectionService = CollectionService(isar);
+        await collectionService.saveCollection(collection);
+      }
 
       // Atualiza a lista de coleções
       ref.invalidate(collectionsProvider);
@@ -91,7 +98,6 @@ class _ImportCollectionDialogState extends ConsumerState<ImportCollectionDialog>
     
     return AlertDialog(
       title: const Text('Import Collection'),
-      // backgroundColor removido para usar o do tema
       content: SizedBox(
         width: 450,
         child: Column(

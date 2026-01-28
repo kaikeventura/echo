@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:echo/features/home/presentation/import_collection_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -176,6 +177,8 @@ class TopMenuBar extends ConsumerWidget {
             const PopupMenuItem(value: 'new_collection', child: Text('New Collection')),
             const PopupMenuItem(value: 'new_request', child: Text('New Request')),
             const PopupMenuDivider(),
+            const PopupMenuItem(value: 'import', child: Text('Import')),
+            const PopupMenuDivider(),
             const PopupMenuItem(value: 'settings', child: Text('Settings')),
             const PopupMenuDivider(),
             const PopupMenuItem(value: 'exit', child: Text('Exit')),
@@ -185,6 +188,11 @@ class TopMenuBar extends ConsumerWidget {
               HomeDialogs.showCreateCollectionDialog(context, ref);
             } else if (value == 'new_request') {
               HomeDialogs.showCreateRequestDialog(context, ref);
+            } else if (value == 'import') {
+              showDialog(
+                context: context,
+                builder: (context) => const ImportCollectionDialog(),
+              );
             } else if (value == 'settings') {
               showDialog(
                 context: context,
