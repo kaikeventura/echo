@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'export_collection_dialog.dart';
 import 'import_collection_dialog.dart';
+import 'about_dialog.dart';
 
 class HoverMenuButton extends StatefulWidget {
   final String title;
@@ -182,8 +184,23 @@ class TopMenuBar extends StatelessWidget {
             const PopupMenuItem(value: 'github', child: Text('GitHub')),
             const PopupMenuItem(value: 'about', child: Text('About')),
           ],
-          onSelected: (value) {
-            print('Selected: $value');
+          onSelected: (value) async {
+            if (value == 'github') {
+              final Uri url = Uri.parse('https://github.com/kaikeventura/echo');
+              if (!await launchUrl(url)) {
+                // Tratar erro se não conseguir abrir
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not launch GitHub URL')),
+                  );
+                }
+              }
+            } else if (value == 'about') {
+              showDialog(
+                context: context,
+                builder: (context) => const EchoAboutDialog(),
+              );
+            }
           },
         ),
       ],

@@ -87,4 +87,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Built with ❤️ by [Kaike](https://github.com/kaike) using Flutter.
+Built with ❤️ by [Kaike](https://github.com/kaikeventura) using Flutter.
