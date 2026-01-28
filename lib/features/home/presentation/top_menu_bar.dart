@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'export_collection_dialog.dart';
 import 'import_collection_dialog.dart';
 import 'about_dialog.dart';
+import '../../settings/presentation/settings_dialog.dart'; // Importar SettingsDialog
 
 class HoverMenuButton extends StatefulWidget {
   final String title;
@@ -173,6 +174,11 @@ class TopMenuBar extends StatelessWidget {
                 context: context,
                 builder: (context) => const ImportCollectionDialog(),
               );
+            } else if (value == 'settings') {
+              showDialog(
+                context: context,
+                builder: (context) => const SettingsDialog(),
+              );
             } else {
               print('Selected: $value');
             }
@@ -188,7 +194,6 @@ class TopMenuBar extends StatelessWidget {
             if (value == 'github') {
               final Uri url = Uri.parse('https://github.com/kaikeventura/echo');
               if (!await launchUrl(url)) {
-                // Tratar erro se não conseguir abrir
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Could not launch GitHub URL')),
