@@ -37,7 +37,7 @@ class RequestExecution extends _$RequestExecution {
     state = const AsyncValue.loading();
 
     try {
-      final requestToSend = await _cloneAndApplyAuth(activeRequest, parentCollection);
+      final requestToSend = await cloneAndApplyAuth(activeRequest, parentCollection);
       
       final settings = ref.read(settingsProvider).value;
       final httpService = HttpService(settings: settings);
@@ -48,7 +48,7 @@ class RequestExecution extends _$RequestExecution {
     }
   }
 
-  Future<RequestModel> _cloneAndApplyAuth(RequestModel original, CollectionModel? collection) async {
+  Future<RequestModel> cloneAndApplyAuth(RequestModel original, CollectionModel? collection) async {
     final clone = RequestModel()
       ..id = original.id
       ..name = original.name
@@ -89,28 +89,30 @@ class RequestExecution extends _$RequestExecution {
 
     // 2. Aplicar autenticação
     final auth = clone.auth;
-    if (auth == null) return clone;
+    if (auth == null || auth.type == 'no_auth') {
+      return clone;
+    }
 
     switch (auth.type) {
       case 'basic':
-        if (auth.basicUsername != null && auth.basicPassword != null) {
-          final credentials = base64Encode(utf8.encode('${auth.basicUsername}:${auth.basicPassword}'));
-          clone.headers!.add(RequestHeader()..key = 'Authorization'..value = 'Basic $credentials');
+        if (auth.basicUsername?.isNotEmpty == true) {
+          final credentials = base64Encode(utf8.encode('${auth.basicUsername}:${auth.basicPassword ?? ''}'));
+          _addOrUpdateHeader(clone.headers!, 'Authorization', 'Basic $credentials');
         }
         break;
       case 'bearer':
-        if (auth.bearerToken != null) {
-          clone.headers!.add(RequestHeader()..key = 'Authorization'..value = 'Bearer ${auth.bearerToken}');
+        if (auth.bearerToken?.isNotEmpty == true) {
+          _addOrUpdateHeader(clone.headers!, 'Authorization', 'Bearer ${auth.bearerToken!}');
         }
         break;
       case 'api_key':
-        if (auth.apiKeyKey != null && auth.apiKeyValue != null) {
+        if (auth.apiKeyKey?.isNotEmpty == true && auth.apiKeyValue != null) {
           if (auth.apiKeyLocation == 'header') {
-            clone.headers!.add(RequestHeader()..key = auth.apiKeyKey..value = auth.apiKeyValue);
+            _addOrUpdateHeader(clone.headers!, auth.apiKeyKey!, auth.apiKeyValue!);
           } else if (auth.apiKeyLocation == 'query') {
             final uri = Uri.parse(clone.url);
             final newParams = Map<String, dynamic>.from(uri.queryParameters);
-            newParams[auth.apiKeyKey!] = auth.apiKeyValue;
+            newParams[auth.apiKeyKey!] = auth.apiKeyValue!;
             clone.url = uri.replace(queryParameters: newParams).toString();
           }
         }
@@ -118,6 +120,15 @@ class RequestExecution extends _$RequestExecution {
     }
 
     return clone;
+  }
+
+  void _addOrUpdateHeader(List<RequestHeader> headers, String key, String value) {
+    final index = headers.indexWhere((h) => h.key?.toLowerCase() == key.toLowerCase());
+    if (index != -1) {
+      headers[index].value = value;
+    } else {
+      headers.add(RequestHeader()..key = key..value = value);
+    }
   }
 
   String _interpolateUrl(String url, List<EnvironmentVariable> env) {

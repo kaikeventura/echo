@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import '../../../models/folder_model.dart';
 import '../../../providers/active_request_provider.dart';
 import '../../../providers/collections_provider.dart';
 import '../../../providers/open_requests_provider.dart';
+import '../../../providers/request_execution_provider.dart';
 import '../../../utils/http_colors.dart';
 
 // Helper class to carry drag data
@@ -323,7 +325,7 @@ class SidebarWidget extends ConsumerWidget {
   }
 
   // ... (Métodos de interpolação e cURL mantidos iguais) ...
-  void _copyCurlToClipboard(BuildContext context, WidgetRef ref, RequestModel request) {
+  Future<void> _copyCurlToClipboard(BuildContext context, WidgetRef ref, RequestModel request) async {
     final collections = ref.read(collectionsProvider).valueOrNull ?? [];
     
     CollectionModel? parentCollection;
@@ -342,89 +344,17 @@ class SidebarWidget extends ConsumerWidget {
       if (parentCollection != null) break;
     }
 
-    RequestModel requestToUse = request;
-
-    if (parentCollection != null) {
-       if (!parentCollection.activeEnvironment.isLoaded) {
-         parentCollection.activeEnvironment.loadSync();
-       }
-       final activeProfile = parentCollection.activeEnvironment.value;
-       
-       if (activeProfile != null && activeProfile.variables != null) {
-         requestToUse = _interpolateRequest(request, activeProfile.variables!);
-       }
-    }
+    final requestExecNotifier = ref.read(requestExecutionProvider.notifier);
+    final requestToUse = await requestExecNotifier.cloneAndApplyAuth(request, parentCollection);
 
     final curl = _generateCurl(requestToUse);
-    Clipboard.setData(ClipboardData(text: curl));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('cURL copied to clipboard')),
-    );
-  }
-
-  RequestModel _interpolateRequest(RequestModel original, List<EnvironmentVariable> env) {
-    final clone = RequestModel()
-      ..id = original.id
-      ..name = original.name
-      ..method = original.method
-      ..url = original.url
-      ..body = original.body
-      ..savedAt = original.savedAt;
-
-    if (original.headers != null) {
-      clone.headers = original.headers!
-          .map((h) => RequestHeader()
-            ..key = h.key
-            ..value = h.value)
-          .toList();
+    await Clipboard.setData(ClipboardData(text: curl));
+    
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('cURL copied to clipboard')),
+      );
     }
-
-    clone.url = _interpolateUrl(clone.url, env);
-
-    if (clone.headers != null) {
-      for (var header in clone.headers!) {
-        header.value = _interpolateString(header.value, env);
-      }
-    }
-
-    clone.body = _interpolateString(clone.body, env);
-
-    return clone;
-  }
-
-  String _interpolateUrl(String url, List<EnvironmentVariable> env) {
-    String result = url;
-    for (var variable in env) {
-      if (variable.key != null && variable.value != null) {
-        final key = variable.key!;
-        final value = variable.value!;
-        final encodedValue = Uri.encodeComponent(value);
-        
-        result = result.replaceAll('%7B%7B$key%7D%7D', encodedValue);
-        result = result.replaceAll('%7b%7b$key%7d%7d', encodedValue);
-        
-        result = result.replaceAll('{{$key}}', encodedValue);
-      }
-    }
-    return result;
-  }
-
-  String _interpolateString(String? text, List<EnvironmentVariable> env) {
-    if (text == null) return '';
-    String result = text;
-    for (var variable in env) {
-      if (variable.key != null && variable.value != null) {
-        final key = variable.key!;
-        final value = variable.value!;
-        
-        result = result.replaceAll('{{$key}}', value);
-        
-        final encodedValue = Uri.encodeComponent(value);
-        result = result.replaceAll('%7B%7B$key%7D%7D', encodedValue);
-        result = result.replaceAll('%7b%7b$key%7d%7d', encodedValue);
-      }
-    }
-    return result;
   }
 
   String _generateCurl(RequestModel request) {
