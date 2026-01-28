@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 
 import 'package:echo/models/collection_model.dart';
@@ -8,71 +7,79 @@ import 'package:echo/models/request_model.dart';
 class PostmanImporter {
   CollectionModel import(String postmanJson) {
     final postmanData = json.decode(postmanJson);
-    final collectionName = postmanData['info']['name'];
-    final items = postmanData['item'] as List;
+    final info = postmanData['info'];
+    final collectionName = (info is Map ? info['name'] : null) ?? 'Imported Collection';
+    final items = postmanData['item'] as List? ?? [];
 
     final collection = CollectionModel()..name = collectionName;
 
     for (var item in items) {
-      _parseItem(item, collection);
+      if (item is Map<String, dynamic>) {
+        _parseItem(item, collection, null);
+      }
     }
 
     return collection;
   }
 
-  void _parseItem(Map<String, dynamic> item, CollectionModel collection) {
-    if (item.containsKey('item')) {
-      // It's a folder
-      final folder = FolderModel()..name = item['name'];
-      collection.folders.add(folder);
-
-      for (var subItem in item['item']) {
-        _parseSubItem(subItem, folder);
+  void _parseItem(Map<String, dynamic> itemData, CollectionModel collection, FolderModel? parentFolder) {
+    if (itemData.containsKey('item') && itemData['item'] is List) {
+      final folder = FolderModel()..name = itemData['name'] as String? ?? 'Unnamed Folder';
+      
+      if (parentFolder != null) {
+        collection.importedFolders.add(folder);
+      } else {
+        collection.importedFolders.add(folder);
       }
-    } else {
-      // It's a request at the root
-      final request = _parseRequest(item);
-      if (request != null) {
-        collection.requests.add(request);
-      }
-    }
-  }
 
-  void _parseSubItem(Map<String, dynamic> item, FolderModel folder) {
-    if (item.containsKey('item')) {
-      final subFolder = FolderModel()..name = item['name'];
-      // Note: This creates a flat structure of folders for simplicity.
-      // A recursive approach would be needed for nested folders.
-      for (var subItem in item['item']) {
-        final request = _parseRequest(subItem);
-        if (request != null) {
-          subFolder.requests.add(request);
+      for (var subItemData in (itemData['item'] as List)) {
+        if (subItemData is Map<String, dynamic>) {
+          _parseItem(subItemData, collection, folder);
         }
       }
-    } else {
-      final request = _parseRequest(item);
+    } 
+    else if (itemData.containsKey('request')) {
+      final request = _parseRequest(itemData);
       if (request != null) {
-        folder.requests.add(request);
+        if (parentFolder != null) {
+          parentFolder.importedRequests.add(request);
+        } else {
+          collection.importedRequests.add(request);
+        }
       }
     }
   }
 
   RequestModel? _parseRequest(Map<String, dynamic> item) {
-    if (!item.containsKey('request')) {
+    final requestData = item['request'];
+    if (requestData is! Map<String, dynamic>) {
       return null;
     }
 
-    final requestData = item['request'];
-    final url = requestData['url']['raw'];
-    final method = requestData['method'];
-    final name = item['name'];
-    final body = requestData['body']?['raw'];
+    final name = item['name'] as String? ?? 'Unnamed Request';
+    
+    String url = '';
+    final urlData = requestData['url'];
+    if (urlData is String) {
+      url = urlData;
+    } else if (urlData is Map) {
+      url = urlData['raw'] as String? ?? '';
+    }
+
+    final method = requestData['method'] as String? ?? 'GET';
+    
+    String body = '';
+    final bodyData = requestData['body'];
+    if (bodyData is Map) {
+      body = bodyData['raw'] as String? ?? '';
+    }
 
     final request = RequestModel()
       ..name = name
       ..url = url
       ..method = method
-      ..body = body ?? '';
+      ..body = body
+      ..savedAt = DateTime.now(); // <-- FIX: Add the current timestamp
 
     return request;
   }

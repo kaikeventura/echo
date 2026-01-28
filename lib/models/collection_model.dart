@@ -23,6 +23,12 @@ class CollectionModel {
   // Lista de todos os perfis de ambiente disponíveis para esta coleção
   final environmentProfiles = IsarLinks<EnvironmentProfile>();
 
+  @ignore
+  List<RequestModel> importedRequests = [];
+
+  @ignore
+  List<FolderModel> importedFolders = [];
+
   Future<Map<String, dynamic>> toJson() async {
     await requests.load();
     await folders.load();
