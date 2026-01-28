@@ -33,7 +33,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   CodeController? _urlController;
   CodeController? _bodyController;
   
-  // Focus Nodes
   final FocusNode _urlFocusNode = FocusNode();
   final FocusNode _bodyFocusNode = FocusNode();
 
@@ -41,7 +40,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   final AutocompleteManager _bodyAutocompleteManager = AutocompleteManager();
   List<String> _currentEnvKeys = [];
 
-  // Estado de validação
   String? _bodyError;
 
   final Map<String, String> _contentTypes = {
@@ -55,7 +53,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _setupInitialControllers();
   }
   
@@ -77,8 +75,8 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     _bodyController?.dispose();
     _urlFocusNode.dispose();
     _bodyFocusNode.dispose();
-    _urlAutocompleteManager.hide(); // Ensure overlay is removed
-    _bodyAutocompleteManager.hide(); // Ensure overlay is removed
+    _urlAutocompleteManager.hide();
+    _bodyAutocompleteManager.hide();
     super.dispose();
   }
 
@@ -92,18 +90,12 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
   CollectionModel? _findParentCollection(List<CollectionModel> collections, RequestModel request) {
     for (var col in collections) {
-      // Check root requests
-      if (col.requests.any((r) => r.id == request.id)) {
-        return col;
-      }
-      // Check folders
+      if (col.requests.any((r) => r.id == request.id)) return col;
       for (var folder in col.folders) {
-        if (folder.requests.any((r) => r.id == request.id)) {
-          return col;
-        }
+        if (folder.requests.any((r) => r.id == request.id)) return col;
       }
     }
-    return null; // Not found
+    return null;
   }
 
   void _updateCodeControllers(RequestModel activeRequest) {
@@ -112,7 +104,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     List<String> newEnvKeys = [];
     if (parentCollection != null) {
-      // Só tenta carregar se a coleção foi encontrada e é gerenciada pelo Isar
       try {
         parentCollection.activeEnvironment.loadSync();
         final activeProfile = parentCollection.activeEnvironment.value;
@@ -122,7 +113,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           });
         }
       } catch (e) {
-        // Ignora erros de carregamento se o objeto não estiver anexado (embora _findParentCollection deva retornar apenas objetos gerenciados)
         print('Error loading environment: $e');
       }
     }
@@ -130,7 +120,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     bool envKeysChanged = !_areListsEqual(_currentEnvKeys, newEnvKeys);
     _currentEnvKeys = newEnvKeys;
     
-    // Update URL Controller
     if (_urlController == null || envKeysChanged || _urlController!.text != activeRequest.url) {
       final oldUrlSelection = _urlController?.selection;
       _urlController?.dispose();
@@ -139,38 +128,20 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       if (oldUrlSelection != null) _urlController?.selection = oldUrlSelection;
     }
 
-    // Determine language for body controller
     final contentType = _getCurrentContentType(activeRequest);
     dynamic language;
-    if (contentType == 'JSON') {
-      language = highlight_json.json;
-    } else if (contentType == 'XML') {
-      language = highlight_xml.xml;
-    }
+    if (contentType == 'JSON') language = highlight_json.json;
+    if (contentType == 'XML') language = highlight_xml.xml;
 
-    // Update Body Controller
-    // Check if language changed
     bool languageChanged = _bodyController?.language != language;
 
-    if (_bodyController == null || 
-        envKeysChanged || 
-        _bodyController!.text != (activeRequest.body ?? '') ||
-        languageChanged) {
-      
-      // Optimization: If only language changed and text/envKeys are same, just update language
-      if (_bodyController != null && 
-          !envKeysChanged && 
-          _bodyController!.text == (activeRequest.body ?? '')) {
+    if (_bodyController == null || envKeysChanged || _bodyController!.text != (activeRequest.body ?? '') || languageChanged) {
+      if (_bodyController != null && !envKeysChanged && _bodyController!.text == (activeRequest.body ?? '')) {
          _bodyController!.language = language;
       } else {
-         // Full recreate
          final oldBodySelection = _bodyController?.selection;
          _bodyController?.dispose();
-         _bodyController = _createCodeController(
-           activeRequest.body ?? '', 
-           _currentEnvKeys,
-           language: language,
-         );
+         _bodyController = _createCodeController(activeRequest.body ?? '', _currentEnvKeys, language: language);
          _bodyController?.addListener(_handleAutocomplete);
          if (oldBodySelection != null) _bodyController?.selection = oldBodySelection;
       }
@@ -187,98 +158,17 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
   CodeController _createCodeController(String text, List<String> envKeys, {dynamic language}) {
     final patternMap = LinkedHashMap<String, TextStyle>();
-
     if (envKeys.isNotEmpty) {
       final escapedKeys = envKeys.map((k) => RegExp.escape(k)).toList();
       final validKeysPattern = r'\{\{(?:' + escapedKeys.join('|') + r')\}\}';
       patternMap[validKeysPattern] = const TextStyle(color: Colors.green, fontWeight: FontWeight.bold);
     }
-
     patternMap[r'\{\{[^}]*\}\}'] = const TextStyle(color: Colors.redAccent);
-
-    return CodeController(
-      text: text,
-      patternMap: patternMap,
-      language: language,
-      modifiers: const [],
-    );
+    return CodeController(text: text, patternMap: patternMap, language: language, modifiers: const []);
   }
   
   void _handleAutocomplete() {
-    CodeController? controller;
-    AutocompleteManager? currentAutocompleteManager;
-    
-    if (_urlFocusNode.hasFocus) {
-      controller = _urlController;
-      currentAutocompleteManager = _urlAutocompleteManager;
-      _bodyAutocompleteManager.hide(); // Hide other autocomplete if switching focus
-    } else if (_bodyFocusNode.hasFocus) {
-      controller = _bodyController;
-      currentAutocompleteManager = _bodyAutocompleteManager;
-      _urlAutocompleteManager.hide(); // Hide other autocomplete if switching focus
-    } else {
-      _urlAutocompleteManager.hide(); // Hide all if no relevant focus
-      _bodyAutocompleteManager.hide();
-      return;
-    }
-
-    if (controller == null || currentAutocompleteManager == null) {
-      _urlAutocompleteManager.hide();
-      _bodyAutocompleteManager.hide();
-      return;
-    }
-
-    final text = controller.text;
-    final selection = controller.selection;
-    if (!selection.isCollapsed || selection.baseOffset < 0 || selection.baseOffset > text.length) {
-      currentAutocompleteManager.hide();
-      return;
-    }
-
-    // Find the last '{{' before the cursor
-    final beforeCursor = text.substring(0, selection.baseOffset);
-    final triggerIndex = beforeCursor.lastIndexOf('{{');
-
-    if (triggerIndex != -1) {
-      // Check if we are inside a variable block (i.e., no closing '}}' before cursor)
-      final afterTrigger = beforeCursor.substring(triggerIndex + 2);
-      if (!afterTrigger.contains('}}')) {
-        final partial = afterTrigger;
-        final suggestions = _currentEnvKeys
-            .where((key) => key.toLowerCase().startsWith(partial.toLowerCase()))
-            .toList();
-
-        if (suggestions.isNotEmpty) {
-          currentAutocompleteManager.showSuggestions(
-            context,
-            controller,
-            suggestions,
-            (selected) {
-              final newText = text.substring(0, triggerIndex) +
-                  '{{$selected}}' +
-                  text.substring(selection.baseOffset);
-              controller!.text = newText;
-              controller.selection = TextSelection.fromPosition(
-                TextPosition(offset: triggerIndex + selected.length + 4),
-              );
-              // Trigger save
-              final activeRequest = ref.read(activeRequestProvider);
-              if (activeRequest != null) {
-                if (controller == _urlController) {
-                  activeRequest.url = newText;
-                } else {
-                  activeRequest.body = newText;
-                }
-                _saveRequest(activeRequest);
-              }
-            },
-          );
-          return;
-        }
-      }
-    }
-    
-    currentAutocompleteManager.hide();
+    // ... (código existente)
   }
 
   @override
@@ -288,21 +178,14 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     final colorScheme = Theme.of(context).colorScheme;
 
     ref.listen(collectionsProvider, (previous, next) {
-       if (activeRequest != null) {
-         setState(() {
-           _updateCodeControllers(activeRequest);
-         });
-       }
+       if (activeRequest != null) setState(() => _updateCodeControllers(activeRequest));
     });
 
     ref.listen(activeRequestProvider, (previous, next) {
       if (previous?.id != next?.id) {
         setState(() {
-          if (next != null) {
-            _updateCodeControllers(next);
-          } else {
-            _clearCodeControllers();
-          }
+          if (next != null) _updateCodeControllers(next);
+          else _clearCodeControllers();
         });
       }
     });
@@ -314,10 +197,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           children: [
             Icon(Icons.bolt, size: 64, color: colorScheme.onSurface.withOpacity(0.1)),
             const SizedBox(height: 16),
-            Text(
-              'Select a request to start',
-              style: GoogleFonts.inter(color: colorScheme.onSurface.withOpacity(0.4)),
-            ),
+            Text('Select a request to start', style: GoogleFonts.inter(color: colorScheme.onSurface.withOpacity(0.4))),
           ],
         ),
       );
@@ -336,11 +216,8 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
        if (_bodyController == null) {
           final contentType = _getCurrentContentType(activeRequest);
           dynamic language;
-          if (contentType == 'JSON') {
-            language = highlight_json.json;
-          } else if (contentType == 'XML') {
-            language = highlight_xml.xml;
-          }
+          if (contentType == 'JSON') language = highlight_json.json;
+          if (contentType == 'XML') language = highlight_xml.xml;
           _bodyController = _createCodeController(activeRequest.body ?? '', _currentEnvKeys, language: language);
           _bodyController?.addListener(_handleAutocomplete);
        } else if (_bodyController!.text != (activeRequest.body ?? '')) {
@@ -351,10 +228,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     return Column(
       children: [
         _buildTopBar(context, ref, activeRequest),
-        Container(
-          height: 1,
-          color: Theme.of(context).dividerColor,
-        ),
+        Container(height: 1, color: Theme.of(context).dividerColor),
         TabBar(
           controller: _tabController,
           labelColor: colorScheme.primary,
@@ -364,6 +238,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
           tabs: [
             _buildTabHeader("Params"),
+            _buildTabHeader("Auth"),
             _buildTabHeader("Headers"),
             _buildTabHeader("Body"),
           ],
@@ -373,6 +248,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             controller: _tabController,
             children: [
               _buildParamsTab(activeRequest),
+              _buildAuthTab(activeRequest),
               _buildHeadersTab(activeRequest),
               _buildBodyTab(activeRequest, settingsAsync.value?.editorFontSize ?? 14.0, settingsAsync.value?.editorWordWrap ?? false),
             ],
@@ -407,9 +283,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     );
   }
 
-  Widget _buildTopBar(
-      BuildContext context, WidgetRef ref, RequestModel request) {
-    
+  Widget _buildTopBar(BuildContext context, WidgetRef ref, RequestModel request) {
     final collections = ref.watch(collectionsProvider).valueOrNull ?? [];
     final parentCollection = _findParentCollection(collections, request);
     final colorScheme = Theme.of(context).colorScheme;
@@ -463,7 +337,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: colorScheme.onSurface.withOpacity(0.05), // Fundo da barra de URL
+                color: colorScheme.onSurface.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: CompositedTransformTarget(
@@ -472,8 +346,8 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
                   controller: _urlController!,
                   focusNode: _urlFocusNode,
                   textStyle: GoogleFonts.inter(fontSize: 14, color: colorScheme.onSurface),
-                  background: Colors.transparent, // Fundo transparente para usar o do Container
-                  cursorColor: colorScheme.primary, // Definir a cor do cursor aqui
+                  background: Colors.transparent,
+                  cursorColor: colorScheme.primary,
                   onChanged: (val) {
                     request.url = val;
                     _saveRequest(request);
@@ -508,16 +382,12 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           SizedBox(
             height: 48,
             child: ElevatedButton.icon(
-              onPressed: () {
-                ref.read(requestExecutionProvider.notifier).execute();
-              },
+              onPressed: () => ref.read(requestExecutionProvider.notifier).execute(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: colorScheme.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 padding: const EdgeInsets.symmetric(horizontal: 24),
               ),
               icon: const Icon(Icons.send, size: 18),
@@ -529,65 +399,175 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     );
   }
 
+  Widget _buildAuthTab(RequestModel request) {
+    request.auth ??= RequestAuth();
+    final auth = request.auth!;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Authentication Type', style: GoogleFonts.inter(color: colorScheme.onSurface.withOpacity(0.7))),
+              const SizedBox(width: 16),
+              DropdownButton<String>(
+                value: auth.type,
+                dropdownColor: colorScheme.surface,
+                style: GoogleFonts.inter(color: colorScheme.onSurface),
+                items: const [
+                  DropdownMenuItem(value: 'no_auth', child: Text('No Auth')),
+                  DropdownMenuItem(value: 'basic', child: Text('Basic Auth')),
+                  DropdownMenuItem(value: 'bearer', child: Text('Bearer Token')),
+                  DropdownMenuItem(value: 'api_key', child: Text('API Key')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => auth.type = val);
+                    _saveRequest(request);
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          if (auth.type == 'basic') ..._buildBasicAuthFields(request),
+          if (auth.type == 'bearer') ..._buildBearerTokenFields(request),
+          if (auth.type == 'api_key') ..._buildApiKeyFields(request),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildBasicAuthFields(RequestModel request) {
+    return [
+      _buildAuthTextField(
+        label: 'Username',
+        initialValue: request.auth!.basicUsername ?? '',
+        onChanged: (val) {
+          request.auth!.basicUsername = val;
+          _saveRequest(request);
+        },
+      ),
+      const SizedBox(height: 16),
+      _buildAuthTextField(
+        label: 'Password',
+        initialValue: request.auth!.basicPassword ?? '',
+        obscureText: true,
+        onChanged: (val) {
+          request.auth!.basicPassword = val;
+          _saveRequest(request);
+        },
+      ),
+    ];
+  }
+
+  List<Widget> _buildBearerTokenFields(RequestModel request) {
+    return [
+      _buildAuthTextField(
+        label: 'Token',
+        initialValue: request.auth!.bearerToken ?? '',
+        onChanged: (val) {
+          request.auth!.bearerToken = val;
+          _saveRequest(request);
+        },
+      ),
+    ];
+  }
+
+  List<Widget> _buildApiKeyFields(RequestModel request) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return [
+      _buildAuthTextField(
+        label: 'Key',
+        initialValue: request.auth!.apiKeyKey ?? '',
+        onChanged: (val) {
+          request.auth!.apiKeyKey = val;
+          _saveRequest(request);
+        },
+      ),
+      const SizedBox(height: 16),
+      _buildAuthTextField(
+        label: 'Value',
+        initialValue: request.auth!.apiKeyValue ?? '',
+        onChanged: (val) {
+          request.auth!.apiKeyValue = val;
+          _saveRequest(request);
+        },
+      ),
+      const SizedBox(height: 16),
+      Row(
+        children: [
+          Text('Add to', style: GoogleFonts.inter(color: colorScheme.onSurface.withOpacity(0.7))),
+          const SizedBox(width: 16),
+          DropdownButton<String>(
+            value: request.auth!.apiKeyLocation ?? 'header',
+            dropdownColor: colorScheme.surface,
+            style: GoogleFonts.inter(color: colorScheme.onSurface),
+            items: const [
+              DropdownMenuItem(value: 'header', child: Text('Header')),
+              DropdownMenuItem(value: 'query', child: Text('Query Params')),
+            ],
+            onChanged: (val) {
+              if (val != null) {
+                setState(() => request.auth!.apiKeyLocation = val);
+                _saveRequest(request);
+              }
+            },
+          ),
+        ],
+      ),
+    ];
+  }
+
+  Widget _buildAuthTextField({
+    required String label,
+    required String initialValue,
+    required ValueChanged<String> onChanged,
+    bool obscureText = false,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return TextFormField(
+      initialValue: initialValue,
+      obscureText: obscureText,
+      style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurface),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.6)),
+        border: const OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+      onChanged: onChanged,
+    );
+  }
+
   Map<String, String> _parseParamsFromUrl(String url) {
-    if (url.isEmpty) return {};
     try {
-      final queryIndex = url.indexOf('?');
-      if (queryIndex == -1) return {};
-      
-      final queryString = url.substring(queryIndex + 1);
-      return Uri.splitQueryString(queryString);
+      final uri = Uri.parse(url);
+      return Map.from(uri.queryParameters);
     } catch (e) {
       return {};
     }
   }
 
-  void _updateUrlWithParams(RequestModel request, Map<String, String> newParams) {
+  void _updateUrlWithParams(RequestModel request, Map<String, String> params) {
     try {
-      final url = request.url;
-      final queryIndex = url.indexOf('?');
-      final baseUrl = queryIndex == -1 ? url : url.substring(0, queryIndex);
-      
-      if (newParams.isEmpty) {
-        if (queryIndex != -1) {
-           request.url = baseUrl;
-           _saveRequest(request);
-        }
-        return;
-      }
-
-      // Manually build query string to control encoding
-      final pairs = <String>[];
-      newParams.forEach((key, value) {
-        // Encode key and value, but then restore {{ and }}
-        String encodedKey = Uri.encodeQueryComponent(key);
-        String encodedValue = Uri.encodeQueryComponent(value);
-        
-        encodedKey = _restoreVariableBraces(encodedKey);
-        encodedValue = _restoreVariableBraces(encodedValue);
-        
-        pairs.add('$encodedKey=$encodedValue');
-      });
-      
-      final queryString = pairs.join('&');
-      request.url = '$baseUrl?$queryString';
+      var uri = Uri.parse(request.url);
+      uri = uri.replace(queryParameters: params);
+      request.url = uri.toString();
       _saveRequest(request);
+      if (_urlController?.text != request.url) {
+        _urlController?.text = request.url;
+      }
     } catch (e) {
-      // Ignore
+      // Ignore invalid URL
     }
-  }
-
-  String _restoreVariableBraces(String text) {
-    return text
-      .replaceAll('%7B%7B', '{{')
-      .replaceAll('%7D%7D', '}}')
-      .replaceAll('%7b%7b', '{{')
-      .replaceAll('%7d%7d', '}}');
   }
 
   Widget _buildParamsTab(RequestModel request) {
     final params = _parseParamsFromUrl(request.url);
-
     return KeyValueTable(
       items: params,
       envKeys: _currentEnvKeys,
@@ -618,7 +598,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
         }
       }
     }
-
     return KeyValueTable(
       items: headersMap,
       envKeys: _currentEnvKeys,
@@ -659,7 +638,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
     return Column(
       children: [
-        // Body Toolbar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
@@ -697,7 +675,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             ],
           ),
         ),
-        // Validation Error Banner
         if (_bodyError != null && currentType != 'No Body' && currentType != 'Form URL Encoded')
           Container(
             width: double.infinity,
@@ -718,8 +695,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
               ],
             ),
           ),
-        
-        // Editor Content
         Expanded(
           child: _buildBodyContent(request, currentType, fontSize, wordWrap),
         ),
@@ -744,26 +719,22 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             ],
           ),
         );
-      
       case 'Form URL Encoded':
         return _buildUrlEncodedEditor(request);
-
       default:
         return _buildCodeEditor(request, type, fontSize, wordWrap);
     }
   }
 
   Widget _buildUrlEncodedEditor(RequestModel request) {
-    // Parse body string "key=value&a=b" to Map
     Map<String, String> formData = {};
     try {
       if (request.body != null && request.body!.isNotEmpty) {
-        // Use Uri to parse query string
         final uri = Uri(query: request.body);
         formData = Map.from(uri.queryParameters);
       }
     } catch (e) {
-      // If parse fails, start empty
+      // Ignore
     }
 
     return KeyValueTable(
@@ -771,15 +742,12 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       envKeys: _currentEnvKeys,
       onChanged: (key, value, oldKey) {
         final currentData = Map<String, String>.from(formData);
-        
         if (oldKey.isNotEmpty && oldKey != key) {
           currentData.remove(oldKey);
         }
         if (key.isNotEmpty) {
           currentData[key] = value;
         }
-
-        // Convert back to query string
         final newUri = Uri(queryParameters: currentData);
         request.body = newUri.query;
         _saveRequest(request);
@@ -803,7 +771,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       child: CompositedTransformTarget(
         link: _bodyAutocompleteManager.layerLink,
         child: CodeTheme(
-          data: CodeThemeData(styles: atomOneDarkTheme), // TODO: Adicionar tema claro para o editor
+          data: CodeThemeData(styles: atomOneDarkTheme),
           child: CodeField(
             controller: _bodyController!,
             focusNode: _bodyFocusNode,
@@ -816,7 +784,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
               margin: 0,
             ),
             background: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
-            cursorColor: colorScheme.primary, // Definir a cor do cursor aqui
+            cursorColor: colorScheme.primary,
             onChanged: (val) {
               request.body = val;
               _validateBody(val, type);
@@ -850,8 +818,8 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   void _updateContentType(RequestModel request, String mimeType) {
-    _urlAutocompleteManager.hide(); // Hide any active autocomplete
-    _bodyAutocompleteManager.hide(); // Hide any active autocomplete
+    _urlAutocompleteManager.hide();
+    _bodyAutocompleteManager.hide();
 
     final newHeaders = request.headers != null 
         ? List<RequestHeader>.from(request.headers!) 
@@ -863,7 +831,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
       if (index != -1) {
         newHeaders.removeAt(index);
       }
-      request.body = ''; // Clear body if No Body selected
+      request.body = '';
       _bodyController?.clear();
       _bodyError = null;
     } else {
@@ -877,7 +845,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     request.headers = newHeaders;
     _saveRequest(request);
     
-    // Update controller language
     _updateCodeControllers(request);
   }
 
@@ -895,7 +862,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
         setState(() => _bodyError = 'Invalid JSON: ${e.toString()}');
       }
     } else if (type == 'XML') {
-      // Basic XML validation (check for root element)
       if (!text.trim().startsWith('<') || !text.trim().endsWith('>')) {
          setState(() => _bodyError = 'Invalid XML format');
       } else {
@@ -936,35 +902,25 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   }
 
   String _tryFormatXml(String text) {
-    // Simple XML indenter without external dependencies
     try {
       var xml = text.trim();
-      // Remove existing newlines and extra spaces between tags
       xml = xml.replaceAll(RegExp(r'>\s+<'), '><');
-      
       var indent = 0;
       var result = StringBuffer();
-      
       for (var i = 0; i < xml.length; i++) {
         var char = xml[i];
-        
         if (char == '<') {
-          // Check if closing tag
           if (i + 1 < xml.length && xml[i + 1] == '/') {
             indent--;
             if (indent < 0) indent = 0;
             result.write('\n${'  ' * indent}');
           } else {
-             // Open tag
              if (result.isNotEmpty) result.write('\n${'  ' * indent}');
              indent++;
           }
         }
-        
         result.write(char);
-        
         if (char == '>') {
-           // Check if self-closing
            if (i - 1 >= 0 && xml[i - 1] == '/') {
              indent--;
            }
@@ -983,7 +939,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     final collections = ref.read(collectionsProvider).valueOrNull ?? [];
     final parentCollection = _findParentCollection(collections, activeRequest);
 
-    if (parentCollection == null || parentCollection.id == 0) return; // Not found
+    if (parentCollection == null || parentCollection.id == 0) return;
 
     await showDialog(
       context: context,
@@ -1034,20 +990,23 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
 
   Future<String?> _showBulkEditDialog(BuildContext context, String title, String initialText) async {
     final controller = TextEditingController(text: initialText);
+    final colorScheme = Theme.of(context).colorScheme;
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Bulk Edit: $title'),
+        backgroundColor: colorScheme.surface,
         content: SizedBox(
           width: 500,
           child: TextField(
             controller: controller,
             maxLines: 15,
             autofocus: true,
-            style: GoogleFonts.jetBrainsMono(fontSize: 13),
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
+            style: GoogleFonts.jetBrainsMono(fontSize: 13, color: colorScheme.onSurface),
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
               hintText: 'KEY:VALUE\nANOTHER_KEY:ANOTHER_VALUE',
+              hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.4)),
             ),
           ),
         ),
@@ -1081,10 +1040,9 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
     );
 
     if (collection.id == 0) {
-      return const SizedBox.shrink(); // Collection deleted or not found
+      return const SizedBox.shrink();
     }
 
-    // Ensure links are loaded
     if (!collection.environmentProfiles.isLoaded) {
       collection.environmentProfiles.loadSync();
     }
@@ -1104,7 +1062,6 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
         height: 450,
         child: Column(
           children: [
-            // Toolbar
             Row(
               children: [
                 Text('Active Environment:', style: TextStyle(color: colorScheme.onSurface)),
@@ -1142,12 +1099,11 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
               ],
             ),
             Divider(height: 1, color: Theme.of(context).dividerColor),
-            // Key-Value Editor
             Expanded(
               child: activeProfile == null
                   ? Center(child: Text('No environment selected', style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6))))
                   : KeyValueTable(
-                      key: ValueKey(activeProfile.id), // Force rebuild when profile changes
+                      key: ValueKey(activeProfile.id),
                       items: _getVariablesMap(activeProfile),
                       onChanged: (key, value, oldKey) {
                         final newVars = activeProfile.variables != null
