@@ -46,7 +46,7 @@ class _HoverMenuButtonState extends State<HoverMenuButton> {
 
   void _showMenu() {
     _cancelHoverTimer();
-    if (_overlayEntry != null) return; // Menu já está visível
+    if (_overlayEntry != null) return;
 
     final RenderBox? button = context.findRenderObject() as RenderBox?;
     if (button == null) return;
@@ -55,34 +55,34 @@ class _HoverMenuButtonState extends State<HoverMenuButton> {
     if (overlay == null) return;
 
     final Offset position = button.localToGlobal(
-      const Offset(0, 30), // Posiciona o menu abaixo do botão
+      const Offset(0, 30),
       ancestor: overlay,
     );
+
+    final colorScheme = Theme.of(context).colorScheme;
 
     _overlayEntry = OverlayEntry(
       builder: (context) {
         return Stack(
           children: [
-            // Barreira para fechar o menu ao clicar fora
             Positioned.fill(
               child: GestureDetector(
                 onTap: _removeMenu,
                 child: Container(color: Colors.transparent),
               ),
             ),
-            // O conteúdo do menu
             Positioned(
               top: position.dy,
               left: position.dx,
               child: Material(
-                color: const Color(0xFF2D2D2D),
+                color: colorScheme.surface,
                 elevation: 8.0,
                 borderRadius: BorderRadius.circular(4.0),
                 child: IntrinsicWidth(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: _buildMenuItems(),
+                    children: _buildMenuItems(colorScheme),
                   ),
                 ),
               ),
@@ -95,10 +95,22 @@ class _HoverMenuButtonState extends State<HoverMenuButton> {
     Overlay.of(context).insert(_overlayEntry!);
   }
 
-  List<Widget> _buildMenuItems() {
+  List<Widget> _buildMenuItems(ColorScheme colorScheme) {
     final List<Widget> menuItems = [];
     for (final item in widget.items) {
       if (item is PopupMenuItem) {
+        // Extrair o texto do item se for um Text widget para aplicar estilo
+        Widget child = item.child!;
+        if (child is Text) {
+          child = Text(
+            child.data!,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: item.value == 'exit' ? Colors.redAccent : colorScheme.onSurface,
+            ),
+          );
+        }
+
         menuItems.add(
           InkWell(
             onTap: () {
@@ -107,14 +119,15 @@ class _HoverMenuButtonState extends State<HoverMenuButton> {
                 widget.onSelected(item.value);
               }
             },
+            hoverColor: colorScheme.primary.withOpacity(0.1),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              child: item.child,
+              child: child,
             ),
           ),
         );
       } else if (item is PopupMenuDivider) {
-        menuItems.add(const Divider(height: 1, thickness: 1));
+        menuItems.add(Divider(height: 1, thickness: 1, color: colorScheme.onSurface.withOpacity(0.1)));
       }
     }
     return menuItems;
@@ -128,6 +141,7 @@ class _HoverMenuButtonState extends State<HoverMenuButton> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return MouseRegion(
       onEnter: (_) => _startHoverTimer(),
       onExit: (_) => _cancelHoverTimer(),
@@ -139,7 +153,7 @@ class _HoverMenuButtonState extends State<HoverMenuButton> {
           child: Text(
             widget.title,
             style: GoogleFonts.inter(
-              color: Colors.white70,
+              color: colorScheme.onSurface.withOpacity(0.8),
               fontSize: 13,
             ),
           ),
@@ -164,7 +178,7 @@ class TopMenuBar extends ConsumerWidget {
             const PopupMenuDivider(),
             const PopupMenuItem(value: 'settings', child: Text('Settings')),
             const PopupMenuDivider(),
-            const PopupMenuItem(value: 'exit', child: Text('Exit', style: TextStyle(color: Colors.redAccent))),
+            const PopupMenuItem(value: 'exit', child: Text('Exit')),
           ],
           onSelected: (value) {
             if (value == 'new_collection') {

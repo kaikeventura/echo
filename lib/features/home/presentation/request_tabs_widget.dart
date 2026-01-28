@@ -13,6 +13,7 @@ class RequestTabsWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final openRequestsAsync = ref.watch(openRequestsProvider);
     final activeRequest = ref.watch(activeRequestProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return openRequestsAsync.when(
       data: (openRequests) {
@@ -22,9 +23,9 @@ class RequestTabsWidget extends ConsumerWidget {
 
         return Container(
           height: 40,
-          decoration: const BoxDecoration(
-            color: Color(0xFF1E1E1E),
-            border: Border(bottom: BorderSide(color: Colors.white10)),
+          decoration: BoxDecoration(
+            color: colorScheme.surface, // Cor de fundo dinâmica
+            border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
           ),
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
@@ -38,35 +39,37 @@ class RequestTabsWidget extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const SizedBox(height: 40), // Placeholder while loading
+      loading: () => const SizedBox(height: 40),
       error: (err, stack) => const SizedBox.shrink(),
     );
   }
 
   void _showContextMenu(BuildContext context, WidgetRef ref, RequestModel request, Offset tapPosition) {
     final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final colorScheme = Theme.of(context).colorScheme;
     
     showMenu(
       context: context,
       position: RelativeRect.fromRect(
-        tapPosition & const Size(40, 40), // and size of the tap area
+        tapPosition & const Size(40, 40),
         Offset.zero & overlay.size,
       ),
+      color: colorScheme.surface,
       items: [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'close_all',
           height: 32,
-          child: Text('Close All Tabs', style: TextStyle(fontSize: 13)),
+          child: Text('Close All Tabs', style: TextStyle(fontSize: 13, color: colorScheme.onSurface)),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'close_left',
           height: 32,
-          child: Text('Close Tabs to the Left', style: TextStyle(fontSize: 13)),
+          child: Text('Close Tabs to the Left', style: TextStyle(fontSize: 13, color: colorScheme.onSurface)),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'close_right',
           height: 32,
-          child: Text('Close Tabs to the Right', style: TextStyle(fontSize: 13)),
+          child: Text('Close Tabs to the Right', style: TextStyle(fontSize: 13, color: colorScheme.onSurface)),
         ),
       ],
     ).then((value) {
@@ -89,6 +92,8 @@ class RequestTabsWidget extends ConsumerWidget {
 
   Widget _buildTab(
       BuildContext context, WidgetRef ref, RequestModel request, bool isActive) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return GestureDetector(
       onTap: () {
         ref.read(openRequestsProvider.notifier).setActive(request);
@@ -100,11 +105,11 @@ class RequestTabsWidget extends ConsumerWidget {
         width: 180,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF2D2D2D) : Colors.transparent,
+          color: isActive ? colorScheme.primary.withOpacity(0.1) : Colors.transparent,
           border: Border(
-            right: const BorderSide(color: Colors.white10),
+            right: BorderSide(color: Theme.of(context).dividerColor),
             top: isActive 
-                ? BorderSide(color: Theme.of(context).colorScheme.primary, width: 2) 
+                ? BorderSide(color: colorScheme.primary, width: 2) 
                 : BorderSide.none,
           ),
         ),
@@ -124,7 +129,7 @@ class RequestTabsWidget extends ConsumerWidget {
                 request.name.isNotEmpty ? request.name : 'Untitled',
                 style: GoogleFonts.inter(
                   fontSize: 12,
-                  color: isActive ? Colors.white : Colors.white54,
+                  color: isActive ? colorScheme.onSurface : colorScheme.onSurface.withOpacity(0.6),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -136,10 +141,10 @@ class RequestTabsWidget extends ConsumerWidget {
               onTap: () {
                 ref.read(openRequestsProvider.notifier).closeRequest(request);
               },
-              hoverColor: Colors.white10,
-              child: const Padding(
-                padding: EdgeInsets.all(4.0),
-                child: Icon(Icons.close, size: 14, color: Colors.white38),
+              hoverColor: colorScheme.onSurface.withOpacity(0.1),
+              child: Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: Icon(Icons.close, size: 14, color: colorScheme.onSurface.withOpacity(0.4)),
               ),
             ),
           ],

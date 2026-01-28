@@ -87,33 +87,35 @@ class _ImportCollectionDialogState extends ConsumerState<ImportCollectionDialog>
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return AlertDialog(
       title: const Text('Import Collection'),
-      backgroundColor: const Color(0xFF2D2D2D),
+      // backgroundColor removido para usar o do tema
       content: SizedBox(
         width: 450,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Import From', style: GoogleFonts.inter(color: Colors.white70, fontSize: 12)),
+            Text('Import From', style: GoogleFonts.inter(color: colorScheme.onSurface.withOpacity(0.7), fontSize: 12)),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: colorScheme.onSurface.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.white10),
+                border: Border.all(color: colorScheme.onSurface.withOpacity(0.1)),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _selectedType,
                   isExpanded: true,
-                  dropdownColor: const Color(0xFF3D3D3D),
+                  dropdownColor: colorScheme.surface,
                   items: _importTypes.map((type) {
                     return DropdownMenuItem(
                       value: type,
-                      child: Text(type, style: GoogleFonts.inter(fontSize: 13)),
+                      child: Text(type, style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurface)),
                     );
                   }).toList(),
                   onChanged: (val) {
@@ -125,7 +127,7 @@ class _ImportCollectionDialogState extends ConsumerState<ImportCollectionDialog>
               ),
             ),
             const SizedBox(height: 16),
-            Text('Select File', style: GoogleFonts.inter(color: Colors.white70, fontSize: 12)),
+            Text('Select File', style: GoogleFonts.inter(color: colorScheme.onSurface.withOpacity(0.7), fontSize: 12)),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -133,14 +135,14 @@ class _ImportCollectionDialogState extends ConsumerState<ImportCollectionDialog>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: colorScheme.onSurface.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.white10),
+                      border: Border.all(color: colorScheme.onSurface.withOpacity(0.1)),
                     ),
                     child: Text(
                       _fileName ?? 'No file selected',
                       style: GoogleFonts.inter(
-                        color: _fileName != null ? Colors.white : Colors.white38,
+                        color: _fileName != null ? colorScheme.onSurface : colorScheme.onSurface.withOpacity(0.4),
                         fontSize: 13,
                       ),
                       maxLines: 1,
@@ -152,8 +154,8 @@ class _ImportCollectionDialogState extends ConsumerState<ImportCollectionDialog>
                 ElevatedButton(
                   onPressed: _pickFile,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.1),
-                    foregroundColor: Colors.white,
+                    backgroundColor: colorScheme.onSurface.withOpacity(0.1),
+                    foregroundColor: colorScheme.onSurface,
                     elevation: 0,
                   ),
                   child: const Text('Browse'),
@@ -194,7 +196,7 @@ class _ImportCollectionDialogState extends ConsumerState<ImportCollectionDialog>
         ElevatedButton(
           onPressed: (_selectedFilePath == null || _isImporting) ? null : _import,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary,
+            backgroundColor: colorScheme.primary,
             foregroundColor: Colors.white,
           ),
           child: _isImporting 

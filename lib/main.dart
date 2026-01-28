@@ -8,7 +8,9 @@ import 'features/home/presentation/request_tabs_widget.dart';
 import 'features/home/presentation/splash_screen.dart';
 import 'features/request/presentation/request_editor_widget.dart';
 import 'features/request/presentation/response_panel_widget.dart';
-import 'features/home/presentation/top_menu_bar.dart'; // Importar TopMenuBar
+import 'features/home/presentation/top_menu_bar.dart';
+import 'features/settings/providers/settings_provider.dart';
+import 'models/app_settings_model.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,9 +21,9 @@ void main() async {
   WindowOptions windowOptions = const WindowOptions(
     size: Size(1200, 800),
     center: true,
-    backgroundColor: Color(0xFF1E1E1E), // Cor sólida idêntica ao tema (Sem transparência)
+    backgroundColor: Colors.transparent, // Deixar transparente para o app controlar o fundo
     skipTaskbar: false,
-    titleBarStyle: TitleBarStyle.hidden, // Mantém sem barra nativa
+    titleBarStyle: TitleBarStyle.hidden,
   );
 
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -32,30 +34,72 @@ void main() async {
   runApp(const ProviderScope(child: EchoApp()));
 }
 
-class EchoApp extends StatelessWidget {
+class EchoApp extends ConsumerWidget {
   const EchoApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settingsAsync = ref.watch(settingsProvider);
+
+    final themeMode = settingsAsync.when(
+      data: (settings) {
+        switch (settings.themeMode) {
+          case AppThemeMode.light:
+            return ThemeMode.light;
+          case AppThemeMode.dark:
+            return ThemeMode.dark;
+          case AppThemeMode.system:
+          default:
+            return ThemeMode.system;
+        }
+      },
+      loading: () => ThemeMode.system,
+      error: (_, __) => ThemeMode.system,
+    );
+
     return MaterialApp(
       title: 'Echo',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark,
+      themeMode: themeMode,
+      theme: ThemeData(
+        brightness: Brightness.light,
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF5F5F5), // Fundo claro
+        textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF6C63FF),
+          secondary: Color(0xFF00E5FF),
+          surface: Colors.white, // Superfícies brancas
+          background: Color(0xFFF5F5F5),
+          onSurface: Color(0xFF1E1E1E), // Texto escuro
+        ),
+        dividerColor: Colors.grey.shade300,
+        textSelectionTheme: const TextSelectionThemeData(
+          cursorColor: Color(0xFF6C63FF), // Cor do cursor (Primary)
+          selectionColor: Color(0x4D6C63FF), // Cor da seleção (Primary com opacidade)
+          selectionHandleColor: Color(0xFF6C63FF),
+        ),
+      ),
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
-        // Fundo Sólido para evitar artefatos no Linux
         scaffoldBackgroundColor: const Color(0xFF1E1E1E),
-
         textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF6C63FF),
           secondary: Color(0xFF00E5FF),
-          surface: Color(0xFF2D2D2D), // Ligeiramente mais claro que o fundo
+          surface: Color(0xFF2D2D2D),
           background: Color(0xFF1E1E1E),
+          onSurface: Colors.white,
+        ),
+        dividerColor: Colors.white10,
+        textSelectionTheme: const TextSelectionThemeData(
+          cursorColor: Color(0xFF6C63FF), // Cor do cursor (Primary)
+          selectionColor: Color(0x4D6C63FF), // Cor da seleção
+          selectionHandleColor: Color(0xFF6C63FF),
         ),
       ),
-      home: const SplashScreen(), // Inicia pela Splash Screen
+      home: const SplashScreen(),
     );
   }
 }
@@ -65,37 +109,34 @@ class EchoHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Controlador para o divisor principal (vertical)
     final mainSplitController = MultiSplitViewController(
       areas: [
-        Area(size: 250, minimalSize: 200), // Sidebar
-        Area(minimalSize: 400), // Conteúdo Principal
+        Area(size: 250, minimalSize: 200),
+        Area(minimalSize: 400),
       ],
     );
 
-    // Controlador para o divisor de conteúdo (horizontal)
     final contentSplitController = MultiSplitViewController(
       areas: [
-        Area(weight: 0.6, minimalSize: 300), // Editor de Requisição
-        Area(weight: 0.4, minimalSize: 200), // Painel de Resposta
+        Area(weight: 0.6, minimalSize: 300),
+        Area(weight: 0.4, minimalSize: 200),
       ],
     );
 
     return Scaffold(
-      // Topbar customizada que permite arrastar a janela
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(40), // Altura padrão da barra de título
+        preferredSize: const Size.fromHeight(40),
         child: WindowCaption(
-          brightness: Brightness.dark,
-          backgroundColor: const Color(0xFF1E1E1E), // Mesma cor do fundo
-          title: const TopMenuBar(), // A nova barra de menu sem o texto Echo
+          brightness: Theme.of(context).brightness,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          title: const TopMenuBar(),
         ),
       ),
       body: MultiSplitViewTheme(
         data: MultiSplitViewThemeData(
           dividerThickness: 6,
           dividerPainter: DividerPainters.grooved1(
-            color: Theme.of(context).colorScheme.surface,
+            color: Theme.of(context).dividerColor,
             highlightedColor: Theme.of(context).colorScheme.primary,
           ),
         ),

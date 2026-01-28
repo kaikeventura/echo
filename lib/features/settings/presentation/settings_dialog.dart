@@ -35,8 +35,10 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Dialog(
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: colorScheme.surface,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: SizedBox(
@@ -54,18 +56,18 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                     style: GoogleFonts.inter(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white54),
+                    icon: Icon(Icons.close, color: colorScheme.onSurface.withOpacity(0.6)),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1, color: Colors.white10),
+            Divider(height: 1, color: Theme.of(context).dividerColor),
             // Body
             Expanded(
               child: Row(
@@ -73,8 +75,8 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                   // Sidebar Navigation
                   Container(
                     width: 200,
-                    decoration: const BoxDecoration(
-                      border: Border(right: BorderSide(color: Colors.white10)),
+                    decoration: BoxDecoration(
+                      border: Border(right: BorderSide(color: Theme.of(context).dividerColor)),
                     ),
                     child: ListView(
                       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -104,14 +106,16 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
 
   Widget _buildNavItem(int index, String label, IconData icon) {
     final isSelected = _selectedIndex == index;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Material(
       color: Colors.transparent,
       child: ListTile(
         selected: isSelected,
-        selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+        selectedTileColor: colorScheme.primary.withOpacity(0.1),
         leading: Icon(
           icon,
-          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white54,
+          color: isSelected ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.6),
           size: 20,
         ),
         title: Text(
@@ -119,7 +123,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            color: isSelected ? Colors.white : Colors.white70,
+            color: isSelected ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.8),
           ),
         ),
         onTap: () => setState(() => _selectedIndex = index),
@@ -139,7 +143,6 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, stack) => Center(child: Text('Error: $err')),
       data: (settings) {
-        // Atualiza controladores apenas se não estiverem focados ou vazios na inicialização
         if (_timeoutController.text.isEmpty && !_timeoutController.selection.isValid) {
            _timeoutController.text = settings.connectTimeout.toString();
         }
@@ -155,7 +158,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           case 2:
             return _buildNetworkTab(settings);
           case 3:
-            return _buildDataTab(); // Implementado
+            return _buildDataTab();
           default:
             return const SizedBox.shrink();
         }
@@ -164,6 +167,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   }
 
   Widget _buildGeneralTab(AppSettingsModel settings) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -172,7 +176,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           style: GoogleFonts.inter(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 16),
@@ -181,13 +185,13 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           description: 'Select your preferred interface theme',
           child: DropdownButton<AppThemeMode>(
             value: settings.themeMode,
-            dropdownColor: const Color(0xFF2D2D2D),
-            style: GoogleFonts.inter(color: Colors.white),
-            underline: Container(height: 1, color: Colors.white24),
+            dropdownColor: colorScheme.surface,
+            style: GoogleFonts.inter(color: colorScheme.onSurface),
+            underline: Container(height: 1, color: colorScheme.onSurface.withOpacity(0.2)),
             items: AppThemeMode.values.map((mode) {
               return DropdownMenuItem(
                 value: mode,
-                child: Text(_formatEnum(mode.name)),
+                child: Text(_formatEnum(mode.name), style: TextStyle(color: colorScheme.onSurface)),
               );
             }).toList(),
             onChanged: (newMode) {
@@ -202,6 +206,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   }
 
   Widget _buildEditorTab(AppSettingsModel settings) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -210,12 +215,11 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           style: GoogleFonts.inter(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 24),
         
-        // Font Size
         _buildSettingRow(
           label: 'Font Size: ${settings.editorFontSize.toInt()}px',
           description: 'Adjust the font size of the code editor',
@@ -226,7 +230,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
               min: 10.0,
               max: 24.0,
               divisions: 14,
-              activeColor: Theme.of(context).colorScheme.primary,
+              activeColor: colorScheme.primary,
               label: settings.editorFontSize.round().toString(),
               onChanged: (val) {
                 ref.read(settingsProvider.notifier).updateEditorSettings(fontSize: val);
@@ -237,13 +241,12 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
 
         const SizedBox(height: 24),
 
-        // Word Wrap
         _buildSettingRow(
           label: 'Word Wrap',
           description: 'Wrap long lines in the editor',
           child: Switch(
             value: settings.editorWordWrap,
-            activeColor: Theme.of(context).colorScheme.primary,
+            activeColor: colorScheme.primary,
             onChanged: (val) {
               ref.read(settingsProvider.notifier).updateEditorSettings(wordWrap: val);
             },
@@ -254,6 +257,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   }
 
   Widget _buildNetworkTab(AppSettingsModel settings) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -262,18 +266,17 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           style: GoogleFonts.inter(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 24),
         
-        // SSL Verification
         _buildSettingRow(
           label: 'SSL Verification',
           description: 'Validate SSL certificates for HTTPS requests',
           child: Switch(
             value: settings.validateSSL,
-            activeColor: Theme.of(context).colorScheme.primary,
+            activeColor: colorScheme.primary,
             onChanged: (val) {
               ref.read(settingsProvider.notifier).updateNetworkSettings(validateSSL: val);
             },
@@ -282,7 +285,6 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
         
         const SizedBox(height: 24),
         
-        // Connection Timeout
         _buildSettingRow(
           label: 'Connection Timeout (ms)',
           description: 'Maximum time to wait for a connection',
@@ -292,7 +294,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
               controller: _timeoutController,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
+              style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurface),
               decoration: const InputDecoration(
                 isDense: true,
                 contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
@@ -310,7 +312,6 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
 
         const SizedBox(height: 24),
 
-        // Proxy URL
         _buildSettingRow(
           label: 'Proxy URL',
           description: 'HTTP/HTTPS proxy (e.g., http://localhost:8080)',
@@ -318,7 +319,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
             width: 250,
             child: TextField(
               controller: _proxyController,
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
+              style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurface),
               decoration: const InputDecoration(
                 isDense: true,
                 contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
@@ -336,6 +337,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   }
 
   Widget _buildDataTab() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -344,7 +346,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           style: GoogleFonts.inter(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 24),
@@ -385,6 +387,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     required String description,
     required Widget child,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       children: [
         Expanded(
@@ -395,7 +398,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                 label,
                 style: GoogleFonts.inter(
                   fontSize: 14,
-                  color: Colors.white70,
+                  color: colorScheme.onSurface.withOpacity(0.8),
                 ),
               ),
               const SizedBox(height: 4),
@@ -403,7 +406,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                 description,
                 style: GoogleFonts.inter(
                   fontSize: 12,
-                  color: Colors.white38,
+                  color: colorScheme.onSurface.withOpacity(0.5),
                 ),
               ),
             ],
@@ -422,6 +425,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     required IconData icon,
     required VoidCallback onPressed,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       children: [
         Expanded(
@@ -432,7 +436,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                 label,
                 style: GoogleFonts.inter(
                   fontSize: 14,
-                  color: Colors.white70,
+                  color: colorScheme.onSurface.withOpacity(0.8),
                 ),
               ),
               const SizedBox(height: 4),
@@ -440,7 +444,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                 description,
                 style: GoogleFonts.inter(
                   fontSize: 12,
-                  color: Colors.white38,
+                  color: colorScheme.onSurface.withOpacity(0.5),
                 ),
               ),
             ],
@@ -450,8 +454,8 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
         ElevatedButton.icon(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white.withOpacity(0.05),
-            foregroundColor: Colors.white,
+            backgroundColor: colorScheme.onSurface.withOpacity(0.05),
+            foregroundColor: colorScheme.onSurface,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),

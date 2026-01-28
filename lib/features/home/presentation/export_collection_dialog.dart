@@ -1,4 +1,4 @@
-import 'dart:convert'; // Importar dart:convert para utf8
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:echo/providers/collections_provider.dart';
 import 'package:flutter/material.dart';
@@ -14,10 +14,11 @@ class ExportCollectionDialog extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final collectionsAsync = ref.watch(collectionsProvider);
     final CollectionExporter exporter = CollectionExporter();
+    final colorScheme = Theme.of(context).colorScheme;
 
     return AlertDialog(
       title: const Text('Export Collection'),
-      backgroundColor: const Color(0xFF2D2D2D),
+      // backgroundColor removido
       content: SizedBox(
         width: 400,
         height: 300,
@@ -33,20 +34,18 @@ class ExportCollectionDialog extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final collection = collections[index];
                 
-                // Calcular total de requests (raiz + pastas)
                 int totalRequests = collection.requests.length;
                 for (var folder in collection.folders) {
                   totalRequests += folder.requests.length;
                 }
 
                 return ListTile(
-                  title: Text(collection.name),
-                  subtitle: Text('$totalRequests requests'),
+                  title: Text(collection.name, style: TextStyle(color: colorScheme.onSurface)),
+                  subtitle: Text('$totalRequests requests', style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7))),
                   trailing: ElevatedButton(
                     onPressed: () async {
-                      // 1. Exportar a coleção para JSON
                       final String jsonContent = await exporter.export(collection);
-                      print('JSON Content to export: $jsonContent'); // Para depuração
+                      print('JSON Content to export: $jsonContent');
 
                       if (jsonContent.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -56,14 +55,11 @@ class ExportCollectionDialog extends ConsumerWidget {
                         return;
                       }
 
-                      // 2. Gerar o nome do arquivo com a data atual
                       final now = DateTime.now();
                       final formattedDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
                       final fileName = 'echo-collection-$formattedDate';
 
-                      // 3. Salvar o arquivo usando file_saver
                       try {
-                        // Usar utf8.encode para garantir suporte a caracteres especiais
                         final bytes = Uint8List.fromList(utf8.encode(jsonContent));
 
                         final String? filePath = await FileSaver.instance.saveFile(
@@ -83,12 +79,11 @@ class ExportCollectionDialog extends ConsumerWidget {
                           );
                         }
                       } catch (e) {
-                        // Mostrar um feedback de erro
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Error exporting collection: $e')),
                         );
                       } finally {
-                        Navigator.of(context).pop(); // Fecha o diálogo após a ação
+                        Navigator.of(context).pop();
                       }
                     },
                     child: const Text('Export'),

@@ -18,6 +18,7 @@ import '../../../providers/request_execution_provider.dart';
 import '../../../utils/http_colors.dart';
 import '../../../widgets/key_value_table.dart';
 import 'autocomplete_manager.dart';
+import '../../settings/providers/settings_provider.dart';
 
 class RequestEditorWidget extends ConsumerStatefulWidget {
   const RequestEditorWidget({super.key});
@@ -283,6 +284,8 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
   @override
   Widget build(BuildContext context) {
     final activeRequest = ref.watch(activeRequestProvider);
+    final settingsAsync = ref.watch(settingsProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     ref.listen(collectionsProvider, (previous, next) {
        if (activeRequest != null) {
@@ -309,11 +312,11 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.bolt, size: 64, color: Colors.white10),
+            Icon(Icons.bolt, size: 64, color: colorScheme.onSurface.withOpacity(0.1)),
             const SizedBox(height: 16),
             Text(
               'Select a request to start',
-              style: GoogleFonts.inter(color: Colors.white38),
+              style: GoogleFonts.inter(color: colorScheme.onSurface.withOpacity(0.4)),
             ),
           ],
         ),
@@ -321,9 +324,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     }
 
     if (_urlController?.text != activeRequest.url) {
-       // Only update if significantly different to avoid loop, 
-       // but _updateCodeControllers handles the main logic.
-       // This check is for when activeRequest changes from other sources not caught by listeners
        if (_urlController == null) {
           _urlController = _createCodeController(activeRequest.url, _currentEnvKeys);
           _urlController?.addListener(_handleAutocomplete);
@@ -334,7 +334,6 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     
     if (_bodyController?.text != (activeRequest.body ?? '')) {
        if (_bodyController == null) {
-          // Should be handled by _updateCodeControllers but just in case
           final contentType = _getCurrentContentType(activeRequest);
           dynamic language;
           if (contentType == 'JSON') {
@@ -354,13 +353,13 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
         _buildTopBar(context, ref, activeRequest),
         Container(
           height: 1,
-          color: Colors.white10,
+          color: Theme.of(context).dividerColor,
         ),
         TabBar(
           controller: _tabController,
-          labelColor: Theme.of(context).colorScheme.primary,
-          unselectedLabelColor: Colors.white54,
-          indicatorColor: Theme.of(context).colorScheme.primary,
+          labelColor: colorScheme.primary,
+          unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
+          indicatorColor: colorScheme.primary,
           dividerColor: Colors.transparent,
           labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
           tabs: [
@@ -375,7 +374,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             children: [
               _buildParamsTab(activeRequest),
               _buildHeadersTab(activeRequest),
-              _buildBodyTab(activeRequest),
+              _buildBodyTab(activeRequest, settingsAsync.value?.editorFontSize ?? 14.0, settingsAsync.value?.editorWordWrap ?? false),
             ],
           ),
         ),
@@ -413,6 +412,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     
     final collections = ref.watch(collectionsProvider).valueOrNull ?? [];
     final parentCollection = _findParentCollection(collections, request);
+    final colorScheme = Theme.of(context).colorScheme;
     
     EnvironmentProfile? activeProfile;
     if (parentCollection != null) {
@@ -431,13 +431,13 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: colorScheme.onSurface.withOpacity(0.05),
               borderRadius: BorderRadius.circular(8),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: request.method,
-                dropdownColor: const Color(0xFF2D2D2D),
+                dropdownColor: colorScheme.surface,
                 items: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
                     .map((m) => DropdownMenuItem(
                           value: m,
@@ -461,16 +461,24 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: CompositedTransformTarget(
-              link: _urlAutocompleteManager.layerLink,
-              child: CodeField(
-                controller: _urlController!,
-                focusNode: _urlFocusNode,
-                textStyle: GoogleFonts.inter(fontSize: 14),
-                onChanged: (val) {
-                  request.url = val;
-                  _saveRequest(request);
-                },
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.onSurface.withOpacity(0.05), // Fundo da barra de URL
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: CompositedTransformTarget(
+                link: _urlAutocompleteManager.layerLink,
+                child: CodeField(
+                  controller: _urlController!,
+                  focusNode: _urlFocusNode,
+                  textStyle: GoogleFonts.inter(fontSize: 14, color: colorScheme.onSurface),
+                  background: Colors.transparent, // Fundo transparente para usar o do Container
+                  cursorColor: colorScheme.primary, // Definir a cor do cursor aqui
+                  onChanged: (val) {
+                    request.url = val;
+                    _saveRequest(request);
+                  },
+                ),
               ),
             ),
           ),
@@ -479,20 +487,20 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                color: colorScheme.primary.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
                 activeProfile.name,
                 style: GoogleFonts.inter(
-                  color: Theme.of(context).colorScheme.primary,
+                  color: colorScheme.primary,
                   fontWeight: FontWeight.bold,
                   fontSize: 11,
                 ),
               ),
             ),
           IconButton(
-            icon: const Icon(Icons.code, color: Colors.white54),
+            icon: Icon(Icons.code, color: colorScheme.onSurface.withOpacity(0.6)),
             tooltip: 'Collection Environment',
             onPressed: () => _showEnvironmentDialog(context, ref),
           ),
@@ -504,7 +512,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
                 ref.read(requestExecutionProvider.notifier).execute();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
+                backgroundColor: colorScheme.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -645,24 +653,25 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     );
   }
 
-  Widget _buildBodyTab(RequestModel request) {
+  Widget _buildBodyTab(RequestModel request, double fontSize, bool wordWrap) {
     final currentType = _getCurrentContentType(request);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       children: [
         // Body Toolbar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Colors.white10)),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
           ),
           child: Row(
             children: [
               DropdownButton<String>(
                 value: _contentTypes.containsKey(currentType) ? currentType : 'No Body',
-                dropdownColor: const Color(0xFF2D2D2D),
+                dropdownColor: colorScheme.surface,
                 underline: Container(),
-                style: GoogleFonts.inter(fontSize: 12, color: Colors.white),
+                style: GoogleFonts.inter(fontSize: 12, color: colorScheme.onSurface),
                 items: _contentTypes.keys.map((type) {
                   return DropdownMenuItem(
                     value: type,
@@ -682,7 +691,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
                   icon: const Icon(Icons.auto_fix_high, size: 14),
                   label: Text('Prettify', style: GoogleFonts.inter(fontSize: 12)),
                   style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.secondary,
+                    foregroundColor: colorScheme.secondary,
                   ),
                 ),
             ],
@@ -712,24 +721,25 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
         
         // Editor Content
         Expanded(
-          child: _buildBodyContent(request, currentType),
+          child: _buildBodyContent(request, currentType, fontSize, wordWrap),
         ),
       ],
     );
   }
 
-  Widget _buildBodyContent(RequestModel request, String type) {
+  Widget _buildBodyContent(RequestModel request, String type, double fontSize, bool wordWrap) {
+    final colorScheme = Theme.of(context).colorScheme;
     switch (type) {
       case 'No Body':
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.block, size: 48, color: Colors.white10),
+              Icon(Icons.block, size: 48, color: colorScheme.onSurface.withOpacity(0.1)),
               const SizedBox(height: 16),
               Text(
                 'This request has no body',
-                style: GoogleFonts.inter(color: Colors.white24),
+                style: GoogleFonts.inter(color: colorScheme.onSurface.withOpacity(0.3)),
               ),
             ],
           ),
@@ -739,7 +749,7 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
         return _buildUrlEncodedEditor(request);
 
       default:
-        return _buildCodeEditor(request, type);
+        return _buildCodeEditor(request, type, fontSize, wordWrap);
     }
   }
 
@@ -784,24 +794,29 @@ class _RequestEditorWidgetState extends ConsumerState<RequestEditorWidget>
     );
   }
 
-  Widget _buildCodeEditor(RequestModel request, String type) {
+  Widget _buildCodeEditor(RequestModel request, String type, double fontSize, bool wordWrap) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: CompositedTransformTarget(
         link: _bodyAutocompleteManager.layerLink,
         child: CodeTheme(
-          data: CodeThemeData(styles: atomOneDarkTheme),
+          data: CodeThemeData(styles: atomOneDarkTheme), // TODO: Adicionar tema claro para o editor
           child: CodeField(
             controller: _bodyController!,
             focusNode: _bodyFocusNode,
-            textStyle: GoogleFonts.jetBrainsMono(fontSize: 13, height: 1.5),
+            textStyle: GoogleFonts.jetBrainsMono(fontSize: fontSize, height: 1.5),
             lineNumbers: true,
-            lineNumberStyle: const LineNumberStyle(
-              textStyle: TextStyle(color: Colors.white24, fontSize: 12),
+            wrap: wordWrap,
+            lineNumberStyle: LineNumberStyle(
+              textStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.4), fontSize: 12),
               width: 48,
               margin: 0,
             ),
-            background: const Color(0xFF1E1E1E),
+            background: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
+            cursorColor: colorScheme.primary, // Definir a cor do cursor aqui
             onChanged: (val) {
               request.body = val;
               _validateBody(val, type);
@@ -1079,9 +1094,11 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
 
     final profiles = collection.environmentProfiles;
     final activeProfile = collection.activeEnvironment.value;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return AlertDialog(
       title: Text('Environment: ${collection.name}'),
+      backgroundColor: colorScheme.surface,
       content: SizedBox(
         width: 600,
         height: 450,
@@ -1090,19 +1107,21 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
             // Toolbar
             Row(
               children: [
-                const Text('Active Environment:'),
+                Text('Active Environment:', style: TextStyle(color: colorScheme.onSurface)),
                 const SizedBox(width: 16),
                 Expanded(
                   child: DropdownButton<int?>(
                     value: activeProfile?.id,
+                    dropdownColor: colorScheme.surface,
+                    style: GoogleFonts.inter(color: colorScheme.onSurface),
                     items: [
-                      const DropdownMenuItem(
+                      DropdownMenuItem(
                         value: null,
-                        child: Text('None'),
+                        child: Text('None', style: TextStyle(color: colorScheme.onSurface)),
                       ),
                       ...profiles.map((p) => DropdownMenuItem(
                             value: p.id,
-                            child: Text(p.name),
+                            child: Text(p.name, style: TextStyle(color: colorScheme.onSurface)),
                           )),
                     ],
                     onChanged: (profileId) {
@@ -1111,22 +1130,22 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.edit_note),
+                  icon: Icon(Icons.edit_note, color: colorScheme.onSurface.withOpacity(0.6)),
                   tooltip: 'Bulk Edit',
                   onPressed: activeProfile == null ? null : () => _showBulkEditDialogForEnv(activeProfile),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.add),
+                  icon: Icon(Icons.add, color: colorScheme.onSurface.withOpacity(0.6)),
                   tooltip: 'New Environment',
                   onPressed: () => _addNewProfile(collection.id),
                 ),
               ],
             ),
-            const Divider(),
+            Divider(height: 1, color: Theme.of(context).dividerColor),
             // Key-Value Editor
             Expanded(
               child: activeProfile == null
-                  ? const Center(child: Text('No environment selected'))
+                  ? Center(child: Text('No environment selected', style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6))))
                   : KeyValueTable(
                       key: ValueKey(activeProfile.id), // Force rebuild when profile changes
                       items: _getVariablesMap(activeProfile),
@@ -1230,20 +1249,23 @@ class _EnvironmentDialogState extends ConsumerState<EnvironmentDialog> {
 
   Future<String?> _showBulkEditDialog(BuildContext context, String title, String initialText) async {
     final controller = TextEditingController(text: initialText);
+    final colorScheme = Theme.of(context).colorScheme;
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Bulk Edit: $title'),
+        backgroundColor: colorScheme.surface,
         content: SizedBox(
           width: 500,
           child: TextField(
             controller: controller,
             maxLines: 15,
             autofocus: true,
-            style: GoogleFonts.jetBrainsMono(fontSize: 13),
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
+            style: GoogleFonts.jetBrainsMono(fontSize: 13, color: colorScheme.onSurface),
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
               hintText: 'KEY:VALUE\nANOTHER_KEY:ANOTHER_VALUE',
+              hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.4)),
             ),
           ),
         ),

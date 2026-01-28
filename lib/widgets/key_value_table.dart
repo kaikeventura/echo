@@ -34,20 +34,21 @@ class _KeyValueTableState extends State<KeyValueTable> {
   @override
   Widget build(BuildContext context) {
     final entries = widget.items.entries.toList();
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       children: [
         // Header
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Colors.white10)),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
           ),
           child: Row(
             children: [
-              Expanded(child: _buildHeaderLabel('Key')),
+              Expanded(child: _buildHeaderLabel('Key', colorScheme)),
               const SizedBox(width: 16),
-              Expanded(child: _buildHeaderLabel('Value')),
+              Expanded(child: _buildHeaderLabel('Value', colorScheme)),
               const SizedBox(width: 40),
             ],
           ),
@@ -59,7 +60,7 @@ class _KeyValueTableState extends State<KeyValueTable> {
             itemCount: entries.length + 1,
             itemBuilder: (context, index) {
               if (index == entries.length) {
-                return _buildAddRow();
+                return _buildAddRow(colorScheme);
               }
               
               final entry = entries[index];
@@ -78,18 +79,18 @@ class _KeyValueTableState extends State<KeyValueTable> {
     );
   }
 
-  Widget _buildHeaderLabel(String text) {
+  Widget _buildHeaderLabel(String text, ColorScheme colorScheme) {
     return Text(
       text,
       style: GoogleFonts.inter(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: Colors.white54,
+        color: colorScheme.onSurface.withOpacity(0.5),
       ),
     );
   }
 
-  Widget _buildAddRow() {
+  Widget _buildAddRow(ColorScheme colorScheme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(
@@ -97,10 +98,10 @@ class _KeyValueTableState extends State<KeyValueTable> {
           Expanded(
             child: TextField(
               controller: _newKeyController,
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
-              decoration: const InputDecoration(
+              style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurface),
+              decoration: InputDecoration(
                 hintText: 'New Key',
-                hintStyle: TextStyle(color: Colors.white24),
+                hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.3)),
                 border: InputBorder.none,
                 isDense: true,
               ),
@@ -111,10 +112,10 @@ class _KeyValueTableState extends State<KeyValueTable> {
           Expanded(
             child: TextField(
               controller: _newValueController,
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white70),
-              decoration: const InputDecoration(
+              style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurface.withOpacity(0.7)),
+              decoration: InputDecoration(
                 hintText: 'Value',
-                hintStyle: TextStyle(color: Colors.white24),
+                hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.3)),
                 border: InputBorder.none,
                 isDense: true,
               ),
@@ -122,7 +123,7 @@ class _KeyValueTableState extends State<KeyValueTable> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.add, size: 16, color: Colors.white24),
+            icon: Icon(Icons.add, size: 16, color: colorScheme.onSurface.withOpacity(0.3)),
             onPressed: _addNewItem,
             splashRadius: 20,
           ),
@@ -135,14 +136,11 @@ class _KeyValueTableState extends State<KeyValueTable> {
     final key = _newKeyController.text.trim();
     final value = _newValueController.text.trim();
 
-    // Allow adding if key is not empty OR if we want to add a placeholder
-    // But Map keys must be unique.
     if (key.isNotEmpty) {
       widget.onChanged(key, value, '');
       _newKeyController.clear();
       _newValueController.clear();
     } else {
-      // If key is empty, check if we already have an empty key
       if (!widget.items.containsKey('')) {
         widget.onChanged('', value, '');
         _newKeyController.clear();
@@ -189,10 +187,8 @@ class _KeyValueRowState extends State<_KeyValueRow> {
     _keyController.addListener(() => _handleAutocomplete(_keyController, _keyFocusNode, _keyAutocomplete));
     _valueController.addListener(() => _handleAutocomplete(_valueController, _valueFocusNode, _valueAutocomplete));
 
-    // Save on blur for Key
     _keyFocusNode.addListener(() async {
       if (!_keyFocusNode.hasFocus) {
-        // Delay hiding to allow tap on suggestion to register
         await Future.delayed(const Duration(milliseconds: 200));
         _keyAutocomplete.hide();
         if (_keyController.text != widget.itemKey) {
@@ -203,10 +199,8 @@ class _KeyValueRowState extends State<_KeyValueRow> {
 
     _valueFocusNode.addListener(() async {
       if (!_valueFocusNode.hasFocus) {
-        // Delay hiding to allow tap on suggestion to register
         await Future.delayed(const Duration(milliseconds: 200));
         _valueAutocomplete.hide();
-        // Value is usually updated on change, but ensure consistency on blur
         if (_valueController.text != widget.itemValue) {
            widget.onChanged(widget.itemKey, _valueController.text, widget.itemKey);
         }
@@ -249,11 +243,9 @@ class _KeyValueRowState extends State<_KeyValueRow> {
                 TextPosition(offset: triggerIndex + selected.length + 4),
               );
               
-              // Trigger update immediately for value
               if (controller == _valueController) {
                 widget.onChanged(widget.itemKey, newText, widget.itemKey);
               }
-              // For key, we wait for blur/submit to avoid row identity change issues
             },
           );
           return;
@@ -267,7 +259,6 @@ class _KeyValueRowState extends State<_KeyValueRow> {
   void didUpdateWidget(_KeyValueRow oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.itemValue != _valueController.text) {
-       // Only update if not focused to avoid overwriting user input
        if (!_valueFocusNode.hasFocus) {
          _valueController.text = widget.itemValue;
        }
@@ -287,9 +278,11 @@ class _KeyValueRowState extends State<_KeyValueRow> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.white10)),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(
@@ -300,7 +293,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
               child: TextField(
                 controller: _keyController,
                 focusNode: _keyFocusNode,
-                style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
+                style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurface),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
                   isDense: true,
@@ -320,7 +313,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
               child: TextField(
                 controller: _valueController,
                 focusNode: _valueFocusNode,
-                style: GoogleFonts.inter(fontSize: 13, color: Colors.white70),
+                style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurface.withOpacity(0.7)),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
                   isDense: true,
@@ -332,7 +325,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close, size: 16, color: Colors.white24),
+            icon: Icon(Icons.close, size: 16, color: colorScheme.onSurface.withOpacity(0.3)),
             onPressed: () => widget.onDeleted(widget.itemKey),
             splashRadius: 20,
           ),

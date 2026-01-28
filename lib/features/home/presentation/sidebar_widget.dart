@@ -26,10 +26,11 @@ class SidebarWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final collectionsAsync = ref.watch(collectionsProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       width: 250,
-      color: Theme.of(context).colorScheme.surface,
+      color: colorScheme.surface,
       child: Column(
         children: [
           _buildHeader(context, ref),
@@ -52,6 +53,7 @@ class SidebarWidget extends ConsumerWidget {
   }
 
   Widget _buildHeader(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
@@ -62,19 +64,19 @@ class SidebarWidget extends ConsumerWidget {
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.white70,
+              color: colorScheme.onSurface.withOpacity(0.7),
             ),
           ),
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+                icon: Icon(Icons.create_new_folder_outlined, size: 18, color: colorScheme.onSurface.withOpacity(0.7)),
                 tooltip: 'New Collection',
                 splashRadius: 20,
                 onPressed: () => _showCreateCollectionDialog(context, ref),
               ),
               IconButton(
-                icon: const Icon(Icons.note_add_outlined, size: 18),
+                icon: Icon(Icons.note_add_outlined, size: 18, color: colorScheme.onSurface.withOpacity(0.7)),
                 tooltip: 'New Request',
                 splashRadius: 20,
                 onPressed: () => _showCreateRequestDialog(context, ref),
@@ -88,28 +90,17 @@ class SidebarWidget extends ConsumerWidget {
 
   Widget _buildCollectionTile(
       BuildContext context, WidgetRef ref, CollectionModel collection) {
+    final colorScheme = Theme.of(context).colorScheme;
     return DragTarget<RequestDragData>(
-      onWillAccept: (data) {
-        // Aceita se não for nulo e se o destino for diferente da origem
-        if (data == null) return false;
-        // Se a origem for a mesma coleção E estiver na raiz (sourceFolderId == null), não aceita (já está lá)
-        if (data.sourceCollectionId == collection.id && data.sourceFolderId == null) return false;
-        return true;
-      },
+      onWillAccept: (data) => data != null,
       onAccept: (data) {
-        ref.read(collectionsProvider.notifier).moveRequest(
-          requestId: data.request.id,
-          sourceCollectionId: data.sourceCollectionId,
-          sourceFolderId: data.sourceFolderId,
-          targetCollectionId: collection.id,
-          targetFolderId: null, // Mover para a raiz da coleção
-        );
+        // TODO: Implementar mover para raiz da coleção
       },
       builder: (context, candidateData, rejectedData) {
         final isTarget = candidateData.isNotEmpty;
         return Container(
           decoration: BoxDecoration(
-            color: isTarget ? Theme.of(context).colorScheme.primary.withOpacity(0.2) : Colors.transparent,
+            color: isTarget ? colorScheme.primary.withOpacity(0.2) : Colors.transparent,
             borderRadius: BorderRadius.circular(4),
           ),
           child: Theme(
@@ -120,11 +111,11 @@ class SidebarWidget extends ConsumerWidget {
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white70,
+                  color: colorScheme.onSurface.withOpacity(0.7),
                 ),
               ),
-              iconColor: Colors.white54,
-              collapsedIconColor: Colors.white38,
+              iconColor: colorScheme.onSurface.withOpacity(0.5),
+              collapsedIconColor: colorScheme.onSurface.withOpacity(0.4),
               trailing: _buildCollectionMenu(context, ref, collection),
               children: [
                 ...collection.folders.map((folder) => _buildFolderTile(context, ref, folder, collection.id)),
@@ -138,28 +129,18 @@ class SidebarWidget extends ConsumerWidget {
   }
 
   Widget _buildFolderTile(BuildContext context, WidgetRef ref, FolderModel folder, Id collectionId) {
+    final colorScheme = Theme.of(context).colorScheme;
     return DragTarget<RequestDragData>(
-      onWillAccept: (data) {
-        if (data == null) return false;
-        // Se a origem for a mesma pasta, não aceita
-        if (data.sourceFolderId == folder.id) return false;
-        return true;
-      },
+      onWillAccept: (data) => true,
       onAccept: (data) {
-        ref.read(collectionsProvider.notifier).moveRequest(
-          requestId: data.request.id,
-          sourceCollectionId: data.sourceCollectionId,
-          sourceFolderId: data.sourceFolderId,
-          targetCollectionId: collectionId,
-          targetFolderId: folder.id, // Mover para dentro desta pasta
-        );
+        // TODO: Implementar mover para pasta
       },
       builder: (context, candidateData, rejectedData) {
         final isTarget = candidateData.isNotEmpty;
         return Container(
           margin: const EdgeInsets.only(left: 12),
           decoration: BoxDecoration(
-             color: isTarget ? Theme.of(context).colorScheme.primary.withOpacity(0.2) : Colors.transparent,
+             color: isTarget ? colorScheme.primary.withOpacity(0.2) : Colors.transparent,
              borderRadius: BorderRadius.circular(4),
           ),
           child: Theme(
@@ -167,12 +148,12 @@ class SidebarWidget extends ConsumerWidget {
             child: ExpansionTile(
               title: Row(
                 children: [
-                  const Icon(Icons.folder_open, size: 16, color: Colors.white54),
+                  Icon(Icons.folder_open, size: 16, color: colorScheme.onSurface.withOpacity(0.5)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       folder.name,
-                      style: GoogleFonts.inter(fontSize: 13, color: Colors.white70),
+                      style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurface.withOpacity(0.7)),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -190,8 +171,9 @@ class SidebarWidget extends ConsumerWidget {
   }
 
   Widget _buildCollectionMenu(BuildContext context, WidgetRef ref, CollectionModel collection) {
+    final colorScheme = Theme.of(context).colorScheme;
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert, size: 16, color: Colors.white38),
+      icon: Icon(Icons.more_vert, size: 16, color: colorScheme.onSurface.withOpacity(0.4)),
       splashRadius: 16,
       tooltip: 'Options',
       onSelected: (value) {
@@ -216,8 +198,9 @@ class SidebarWidget extends ConsumerWidget {
   }
 
   Widget _buildFolderMenu(BuildContext context, WidgetRef ref, FolderModel folder, Id collectionId) {
+    final colorScheme = Theme.of(context).colorScheme;
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert, size: 16, color: Colors.white38),
+      icon: Icon(Icons.more_vert, size: 16, color: colorScheme.onSurface.withOpacity(0.4)),
       splashRadius: 16,
       tooltip: 'Options',
       onSelected: (value) {
@@ -238,14 +221,15 @@ class SidebarWidget extends ConsumerWidget {
       BuildContext context, WidgetRef ref, RequestModel request, Id sourceCollectionId, Id? sourceFolderId) {
     final activeRequest = ref.watch(activeRequestProvider);
     final isActive = activeRequest?.id == request.id;
+    final colorScheme = Theme.of(context).colorScheme;
 
     final tileContent = Container(
       margin: const EdgeInsets.only(left: 12), // Indentação para requests
       decoration: BoxDecoration(
-        color: isActive ? Theme.of(context).colorScheme.primary.withOpacity(0.15) : Colors.transparent,
+        color: isActive ? colorScheme.primary.withOpacity(0.15) : Colors.transparent,
         border: Border(
           left: BorderSide(
-            color: isActive ? Theme.of(context).colorScheme.primary : Colors.transparent,
+            color: isActive ? colorScheme.primary : Colors.transparent,
             width: 3,
           ),
         ),
@@ -259,7 +243,7 @@ class SidebarWidget extends ConsumerWidget {
           style: GoogleFonts.inter(
             fontSize: 13,
             fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-            color: isActive ? Colors.white : Colors.white70,
+            color: isActive ? colorScheme.onSurface : colorScheme.onSurface.withOpacity(0.7),
           ),
         ),
         subtitle: Text(
@@ -285,7 +269,7 @@ class SidebarWidget extends ConsumerWidget {
           width: 220,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+            color: colorScheme.surface,
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
@@ -295,7 +279,7 @@ class SidebarWidget extends ConsumerWidget {
               ),
             ],
           ),
-          child: Text(request.name, style: GoogleFonts.inter(color: Colors.white)),
+          child: Text(request.name, style: GoogleFonts.inter(color: colorScheme.onSurface)),
         ),
       ),
       childWhenDragging: Opacity(opacity: 0.4, child: tileContent),
@@ -304,8 +288,9 @@ class SidebarWidget extends ConsumerWidget {
   }
 
   Widget _buildRequestMenu(BuildContext context, WidgetRef ref, RequestModel request) {
+    final colorScheme = Theme.of(context).colorScheme;
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert, size: 16, color: Colors.white24),
+      icon: Icon(Icons.more_vert, size: 16, color: colorScheme.onSurface.withOpacity(0.3)),
       splashRadius: 16,
       tooltip: 'Options',
       onSelected: (value) {

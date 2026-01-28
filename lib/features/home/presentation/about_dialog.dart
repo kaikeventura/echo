@@ -7,8 +7,10 @@ class EchoAboutDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return AlertDialog(
-      backgroundColor: const Color(0xFF2D2D2D),
+      // backgroundColor removido
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -19,7 +21,7 @@ class EchoAboutDialog extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -27,7 +29,7 @@ class EchoAboutDialog extends StatelessWidget {
             'Version 1.0.0',
             style: GoogleFonts.inter(
               fontSize: 14,
-              color: Colors.white54,
+              color: colorScheme.onSurface.withOpacity(0.6),
             ),
           ),
           const SizedBox(height: 24),
@@ -36,7 +38,7 @@ class EchoAboutDialog extends StatelessWidget {
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 14,
-              color: Colors.white70,
+              color: colorScheme.onSurface.withOpacity(0.8),
             ),
           ),
           const SizedBox(height: 24),
@@ -46,7 +48,7 @@ class EchoAboutDialog extends StatelessWidget {
               'github.com/kaikeventura/echo',
               style: GoogleFonts.inter(
                 fontSize: 14,
-                color: Theme.of(context).colorScheme.primary,
+                color: colorScheme.primary,
                 decoration: TextDecoration.underline,
               ),
             ),
@@ -56,7 +58,7 @@ class EchoAboutDialog extends StatelessWidget {
             'Built with ❤️ by Kaike',
             style: GoogleFonts.inter(
               fontSize: 12,
-              color: Colors.white38,
+              color: colorScheme.onSurface.withOpacity(0.4),
             ),
           ),
         ],
