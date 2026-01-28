@@ -4,7 +4,8 @@ import '../models/request_model.dart';
 import '../models/collection_model.dart';
 import '../models/environment_profile_model.dart';
 import '../models/session_model.dart';
-import '../models/folder_model.dart'; // Importar FolderModel
+import '../models/folder_model.dart';
+import '../models/app_settings_model.dart'; // Importar AppSettingsModel
 
 class IsarService {
   static final IsarService _instance = IsarService._internal();
@@ -26,7 +27,8 @@ class IsarService {
           CollectionModelSchema,
           SessionModelSchema,
           EnvironmentProfileSchema,
-          FolderModelSchema, // Adicionar FolderModelSchema
+          FolderModelSchema,
+          AppSettingsModelSchema, // Adicionar AppSettingsModelSchema
         ],
         directory: dir.path,
         inspector: true,
