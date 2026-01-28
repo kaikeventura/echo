@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../models/app_settings_model.dart';
@@ -13,6 +14,22 @@ class SettingsDialog extends ConsumerStatefulWidget {
 
 class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   int _selectedIndex = 0;
+  late TextEditingController _timeoutController;
+  late TextEditingController _proxyController;
+
+  @override
+  void initState() {
+    super.initState();
+    _timeoutController = TextEditingController();
+    _proxyController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _timeoutController.dispose();
+    _proxyController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -120,13 +137,21 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, stack) => Center(child: Text('Error: $err')),
       data: (settings) {
+        // Atualiza controladores apenas se não estiverem focados ou vazios na inicialização
+        if (_timeoutController.text.isEmpty && !_timeoutController.selection.isValid) {
+           _timeoutController.text = settings.connectTimeout.toString();
+        }
+        if (_proxyController.text.isEmpty && !_proxyController.selection.isValid) {
+           _proxyController.text = settings.proxyUrl ?? '';
+        }
+
         switch (_selectedIndex) {
           case 0:
             return _buildGeneralTab(settings);
           case 1:
             return const Center(child: Text('Editor Settings (Coming Soon)'));
           case 2:
-            return const Center(child: Text('Network Settings (Coming Soon)'));
+            return _buildNetworkTab(settings);
           case 3:
             return const Center(child: Text('Data Settings (Coming Soon)'));
           default:
@@ -168,6 +193,88 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                 ref.read(settingsProvider.notifier).updateThemeMode(newMode);
               }
             },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNetworkTab(AppSettingsModel settings) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Network',
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 24),
+        
+        // SSL Verification
+        _buildSettingRow(
+          label: 'SSL Verification',
+          description: 'Validate SSL certificates for HTTPS requests',
+          child: Switch(
+            value: settings.validateSSL,
+            activeColor: Theme.of(context).colorScheme.primary,
+            onChanged: (val) {
+              ref.read(settingsProvider.notifier).updateNetworkSettings(validateSSL: val);
+            },
+          ),
+        ),
+        
+        const SizedBox(height: 24),
+        
+        // Connection Timeout
+        _buildSettingRow(
+          label: 'Connection Timeout (ms)',
+          description: 'Maximum time to wait for a connection',
+          child: SizedBox(
+            width: 100,
+            child: TextField(
+              controller: _timeoutController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (val) {
+                final timeout = int.tryParse(val);
+                if (timeout != null) {
+                  ref.read(settingsProvider.notifier).updateNetworkSettings(connectTimeout: timeout);
+                }
+              },
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // Proxy URL
+        _buildSettingRow(
+          label: 'Proxy URL',
+          description: 'HTTP/HTTPS proxy (e.g., http://localhost:8080)',
+          child: SizedBox(
+            width: 250,
+            child: TextField(
+              controller: _proxyController,
+              style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                border: OutlineInputBorder(),
+                hintText: 'No Proxy',
+              ),
+              onSubmitted: (val) {
+                ref.read(settingsProvider.notifier).updateNetworkSettings(proxyUrl: val);
+              },
+            ),
           ),
         ),
       ],

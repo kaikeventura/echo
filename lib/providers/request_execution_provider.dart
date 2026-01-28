@@ -6,6 +6,7 @@ import '../models/response_model.dart';
 import '../services/http_service.dart';
 import 'active_request_provider.dart';
 import 'collections_provider.dart';
+import '../features/settings/providers/settings_provider.dart'; // Importar SettingsProvider
 
 part 'request_execution_provider.g.dart';
 
@@ -30,6 +31,14 @@ class RequestExecution extends _$RequestExecution {
         parentCollection = col;
         break;
       }
+      // Check folders
+      for (var folder in col.folders) {
+        if (folder.requests.any((req) => req.id == activeRequest.id)) {
+          parentCollection = col;
+          break;
+        }
+      }
+      if (parentCollection != null) break;
     }
 
     state = const AsyncValue.loading();
@@ -38,7 +47,10 @@ class RequestExecution extends _$RequestExecution {
       // Create a clone of the request to avoid modifying the original
       final requestToSend = await _cloneAndInterpolate(activeRequest, parentCollection);
       
-      final httpService = HttpService();
+      // Obter configurações
+      final settings = ref.read(settingsProvider).value;
+
+      final httpService = HttpService(settings: settings);
       final response = await httpService.executeRequest(requestToSend);
       state = AsyncValue.data(response);
     } catch (e, st) {
@@ -67,25 +79,30 @@ class RequestExecution extends _$RequestExecution {
     if (collection == null) return clone;
 
     // Get active environment
-    await collection.activeEnvironment.load();
-    final activeProfile = collection.activeEnvironment.value;
-    if (activeProfile == null) return clone;
+    // Use try-catch to handle potential Isar errors if collection is not managed
+    try {
+      await collection.activeEnvironment.load();
+      final activeProfile = collection.activeEnvironment.value;
+      if (activeProfile == null) return clone;
 
-    final env = activeProfile.variables ?? [];
-    if (env.isEmpty) return clone;
+      final env = activeProfile.variables ?? [];
+      if (env.isEmpty) return clone;
 
-    // Interpolate URL
-    clone.url = _interpolateUrl(clone.url, env);
+      // Interpolate URL
+      clone.url = _interpolateUrl(clone.url, env);
 
-    // Interpolate Headers
-    if (clone.headers != null) {
-      for (var header in clone.headers!) {
-        header.value = _interpolateString(header.value, env);
+      // Interpolate Headers
+      if (clone.headers != null) {
+        for (var header in clone.headers!) {
+          header.value = _interpolateString(header.value, env);
+        }
       }
-    }
 
-    // Interpolate Body
-    clone.body = _interpolateString(clone.body, env);
+      // Interpolate Body
+      clone.body = _interpolateString(clone.body, env);
+    } catch (e) {
+      // Ignore errors if environment cannot be loaded
+    }
 
     return clone;
   }

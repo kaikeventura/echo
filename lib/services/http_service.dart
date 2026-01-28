@@ -1,12 +1,43 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import '../models/request_model.dart';
 import '../models/response_model.dart';
+import '../models/app_settings_model.dart';
 
 class HttpService {
   final Dio _dio;
 
-  HttpService() : _dio = Dio();
+  HttpService({AppSettingsModel? settings}) : _dio = Dio() {
+    if (settings != null) {
+      // Configurar Timeout
+      _dio.options.connectTimeout = Duration(milliseconds: settings.connectTimeout);
+      _dio.options.receiveTimeout = Duration(milliseconds: settings.connectTimeout);
+      _dio.options.sendTimeout = Duration(milliseconds: settings.connectTimeout);
+
+      // Configurar SSL e Proxy
+      _dio.httpClientAdapter = IOHttpClientAdapter(
+        createHttpClient: () {
+          final client = HttpClient();
+          
+          // SSL Verification
+          if (!settings.validateSSL) {
+            client.badCertificateCallback = (cert, host, port) => true;
+          }
+
+          // Proxy
+          if (settings.proxyUrl != null && settings.proxyUrl!.isNotEmpty) {
+            client.findProxy = (uri) {
+              return 'PROXY ${settings.proxyUrl}';
+            };
+          }
+
+          return client;
+        },
+      );
+    }
+  }
 
   Future<ResponseModel> executeRequest(RequestModel request) async {
     final stopwatch = Stopwatch()..start();
