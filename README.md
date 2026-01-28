@@ -18,6 +18,7 @@
     *   **Form URL Encoded**: Visual key-value editor for form data.
 *   **🌈 Semantic Coloring**: HTTP methods and status codes are color-coded for quick recognition.
 *   **📊 Response Metrics**: View status code, execution time, and response size at a glance.
+*   **⬇️ Import Collections**: Import collections from Postman.
 
 ## 🛠️ Tech Stack
 
@@ -62,6 +63,18 @@
     ```bash
     flutter run -d linux
     ```
+
+## ⬇️ Importing Collections
+
+Echo supports importing collections from other API clients.
+
+### Postman
+
+1.  Export your collection from Postman as a `JSON` file.
+2.  In Echo, go to `File > Import`.
+3.  Select `Postman Collection` from the dropdown.
+4.  Choose your exported `JSON` file.
+5.  Click `Import`.
 
 ## 🏗️ Architecture
 
