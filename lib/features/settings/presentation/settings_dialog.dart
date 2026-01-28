@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../models/app_settings_model.dart';
 import '../providers/settings_provider.dart';
+import '../../home/presentation/export_collection_dialog.dart';
+import '../../home/presentation/import_collection_dialog.dart';
 
 class SettingsDialog extends ConsumerStatefulWidget {
   const SettingsDialog({super.key});
@@ -149,11 +151,11 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           case 0:
             return _buildGeneralTab(settings);
           case 1:
-            return _buildEditorTab(settings); // Nova aba
+            return _buildEditorTab(settings);
           case 2:
             return _buildNetworkTab(settings);
           case 3:
-            return const Center(child: Text('Data Settings (Coming Soon)'));
+            return _buildDataTab(); // Implementado
           default:
             return const SizedBox.shrink();
         }
@@ -333,6 +335,51 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     );
   }
 
+  Widget _buildDataTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Data Management',
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 24),
+        
+        _buildActionRow(
+          label: 'Import Collection',
+          description: 'Import collections from Echo JSON files',
+          buttonText: 'Import',
+          icon: Icons.file_upload_outlined,
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => const ImportCollectionDialog(),
+            );
+          },
+        ),
+
+        const SizedBox(height: 24),
+
+        _buildActionRow(
+          label: 'Export Collection',
+          description: 'Export your collections to a JSON file',
+          buttonText: 'Export',
+          icon: Icons.file_download_outlined,
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => const ExportCollectionDialog(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildSettingRow({
     required String label,
     required String description,
@@ -364,6 +411,53 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
         ),
         const SizedBox(width: 16),
         child,
+      ],
+    );
+  }
+
+  Widget _buildActionRow({
+    required String label,
+    required String description,
+    required String buttonText,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: Colors.white70,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: Colors.white38,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 16),
+        ElevatedButton.icon(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white.withOpacity(0.05),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          icon: Icon(icon, size: 18),
+          label: Text(buttonText, style: GoogleFonts.inter(fontSize: 13)),
+        ),
       ],
     );
   }

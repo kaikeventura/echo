@@ -2,10 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'export_collection_dialog.dart';
-import 'import_collection_dialog.dart';
 import 'about_dialog.dart';
-import '../../settings/presentation/settings_dialog.dart'; // Importar SettingsDialog
+import '../../settings/presentation/settings_dialog.dart';
 
 class HoverMenuButton extends StatefulWidget {
   final String title;
@@ -158,23 +156,10 @@ class TopMenuBar extends StatelessWidget {
         HoverMenuButton(
           title: 'File',
           items: [
-            const PopupMenuItem(value: 'import', child: Text('Import Collection')),
-            const PopupMenuItem(value: 'export', child: Text('Export Collection')),
-            const PopupMenuDivider(),
             const PopupMenuItem(value: 'settings', child: Text('Settings')),
           ],
           onSelected: (value) {
-            if (value == 'export') {
-              showDialog(
-                context: context,
-                builder: (context) => const ExportCollectionDialog(),
-              );
-            } else if (value == 'import') {
-              showDialog(
-                context: context,
-                builder: (context) => const ImportCollectionDialog(),
-              );
-            } else if (value == 'settings') {
+            if (value == 'settings') {
               showDialog(
                 context: context,
                 builder: (context) => const SettingsDialog(),
