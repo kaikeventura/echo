@@ -1,24 +1,25 @@
-# The version of CMake to use.
 cmake_minimum_required(VERSION 3.10)
-
-# The project name.
 project(echo LANGUAGES CXX)
 
-# The name of the executable to be created.
+# Set the name of the executable.
 set(BINARY_NAME "echo")
 
-# The version of the project.
-# This value is used when generating build files (e.g., for packaging).
-# It can be overridden on the command line with -DVERSION=...
+# Set the project version.
 if(NOT DEFINED VERSION)
   set(VERSION "1.0.0")
 endif()
 
-# === Flutter Definition ===
-# Add the Flutter library and tool.
-# This must be done before the application-specific sources.
+# Add the Flutter sub-project. This must be done before the runner.
 add_subdirectory(flutter)
 
-# === Application-specific Sources ===
 # Add the application-specific sources.
 add_subdirectory(runner)
+
+# === Installation ===
+# By default, "make install" will install everything required to run the
+# application.
+install(
+  DIRECTORY "build/linux/x64/release/bundle"
+  DESTINATION "."
+  COMPONENT "ReleaseBundle"
+)
