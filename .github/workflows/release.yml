@@ -43,16 +43,20 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build windows --release
-      - name: Debug Windows Build Output
+      
+      # Passo de debug melhorado e posicionado antes da falha potencial
+      - name: Debug Build Directory
+        shell: bash
         run: |
-          Get-ChildItem -Path build/windows -Recurse -ErrorAction SilentlyContinue
-          Get-ChildItem -Path build/windows/runner -Recurse -ErrorAction SilentlyContinue
-          Get-ChildItem -Path build/windows/x64 -Recurse -ErrorAction SilentlyContinue
+          echo "Listing build directory..."
+          ls -R build/windows
+
       - name: Prepare Package
         run: |
-          # Revertendo para o caminho padrão do build de release do Windows
-          cd build/windows/runner/Release
-          Compress-Archive -Path * -DestinationPath ../../../../echo-${{ github.ref_name }}-windows-x64.zip
+          # Tentativa com o caminho mais provável: build/windows/x64/runner/Release
+          # Se falhar, o passo de debug acima nos dirá o caminho correto.
+          cd build/windows/x64/runner/Release
+          Compress-Archive -Path * -DestinationPath ../../../../../echo-${{ github.ref_name }}-windows-x64.zip
       - uses: actions/upload-artifact@v4
         with:
           name: echo-${{ github.ref_name }}-windows-x64
