@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -26,7 +27,10 @@ void main() async {
     titleBarStyle: TitleBarStyle.hidden,
   );
 
-  await windowManager.waitUntilReadyToShow(windowOptions, () async {
+  windowManager.waitUntilReadyToShow(windowOptions, () async {
+    if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+      await windowManager.setIcon('assets/images/echo_logo.png');
+    }
     await windowManager.show();
     await windowManager.focus();
   });
