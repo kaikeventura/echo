@@ -4,6 +4,10 @@
 
 **Echo** is a lightweight, high-performance API Client built specifically for Linux desktops using Flutter. Designed with a clean, minimalist aesthetic inspired by tools like Linear and Raycast, Echo aims to provide a seamless developer experience for testing and debugging HTTP requests.
 
+## 📚 Documentation
+
+Full documentation is available in the [Wiki](https://github.com/kaikeventura/echo/wiki).
+
 ## ✨ Features
 
 *   **🚀 High Performance**: Built with Flutter and compiled to native machine code for Linux.
@@ -63,26 +67,6 @@
     ```bash
     flutter run -d linux
     ```
-
-## ⬇️ Importing Collections
-
-Echo supports importing collections from other API clients.
-
-### Postman
-
-1.  Export your collection from Postman as a `JSON` file.
-2.  In Echo, go to `File > Import`.
-3.  Select `Postman Collection` from the dropdown.
-4.  Choose your exported `JSON` file.
-5.  Click `Import`.
-
-## 🏗️ Architecture
-
-Echo follows a simplified **Clean Architecture** pattern to ensure separation of concerns and maintainability:
-
-*   **Presentation Layer**: Widgets, Screens, and Riverpod Providers (Controllers).
-*   **Domain/Model Layer**: Data entities (`RequestModel`, `CollectionModel`, `SessionModel`).
-*   **Data/Service Layer**: Repositories and Services (`IsarService`, `HttpService`).
 
 ## 🤝 Contributing
 

@@ -1,0 +1,21 @@
+name: Publish Wiki
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+
+jobs:
+  publish-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Publish Wiki
+        uses: spenserblack/actions-wiki@v2
+        with:
+          path: docs
+          token: ${{ secrets.GITHUB_TOKEN }}
