@@ -94,7 +94,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-#            artifacts/echo-${{ github.ref_name }}-linux-x64/echo-${{ github.ref_name }}-linux-x64.tar.gz
+            artifacts/echo-${{ github.ref_name }}-linux-x64/echo-${{ github.ref_name }}-linux-x64.tar.gz
             artifacts/echo-${{ github.ref_name }}-windows-x64/echo-${{ github.ref_name }}-windows-x64.zip
-#            artifacts/echo-${{ github.ref_name }}-macos/echo-${{ github.ref_name }}-macos.zip
+            artifacts/echo-${{ github.ref_name }}-macos/echo-${{ github.ref_name }}-macos.zip
           generate_release_notes: true
