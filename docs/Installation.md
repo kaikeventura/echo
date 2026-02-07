@@ -1,46 +1,65 @@
 # Installation
 
+You can install Echo by downloading a pre-built version from our releases or by building from source.
+
 ## From Release (Recommended)
 
-1.  **Download**
-    Go to the [Releases page](https://github.com/kaikeventura/echo/releases) and download the latest `echo-linux-x64.tar.gz` file.
+1.  Go to the [**Releases Page**](https://github.com/kaikeventura/echo/releases).
+2.  Find the latest release and download the correct file for your operating system:
+    *   **Windows**: `echo-vX.Y.Z-windows-x64.zip`
+    *   **macOS**: `echo-vX.Y.Z-macos.zip`
+    *   **Linux**: `echo-vX.Y.Z-linux-x64.tar.gz`
 
-2.  **Extract**
-    Create a directory named `echo` and extract the archive into it.
+---
+
+### Windows
+
+1.  **Extract the `.zip` file.**
+    You will get a folder with all the necessary files.
+2.  **Run the application.**
+    Inside the folder, double-click on `echo.exe`. You can create a shortcut to this file on your Desktop for easier access.
+
+---
+
+### macOS
+
+1.  **Extract the `.zip` file.**
+    This will typically create an `echo.app` bundle.
+2.  **Move to Applications.**
+    Drag the `echo.app` file into your `/Applications` folder.
+3.  **Run the application.**
+    You can now launch Echo from your Applications folder or Launchpad.
+
+*(Note: On the first run, you may need to right-click the app and select "Open" if you see a security warning about the developer not being identified.)*
+
+---
+
+### Linux
+
+1.  **Extract the `.tar.gz` archive.**
     ```bash
-    mkdir echo
-    tar -xzvf echo-linux-x64.tar.gz -C echo
+    mkdir echo && tar -xzvf echo-vX.Y.Z-linux-x64.tar.gz -C echo
     ```
-
-3.  **Run**
-    You can now run the application directly from this folder.
+2.  **Run the application.**
     ```bash
     cd echo
     ./echo
     ```
 
-### Adding to System Menu (Optional)
+#### Adding to System Menu (Optional)
 
-To make Echo appear in your system's application menu, follow these steps:
+To make Echo appear in your system's application menu:
 
-1.  **Move the application folder**
-    Move the `echo` folder you created to `/opt/`, a standard directory for optional software.
+1.  **Move the application folder to `/opt`**:
     ```bash
-    # This command moves the entire 'echo' folder to /opt/
-    sudo mv ../echo /opt/
+    # Assuming you are inside the 'echo' directory
+    sudo mv . /opt/echo
     ```
-    *(Note: Run this command from within the `echo` directory you entered in the previous step, or adjust the path accordingly.)*
-
-2.  **Create a Desktop Entry**
-    Create a file named `echo.desktop` in `~/.local/share/applications/`.
-    ```bash
-    nano ~/.local/share/applications/echo.desktop
-    ```
-
-    Paste the following content. The `icon.png` is already included.
+2.  **Create a desktop entry**:
+    Create a file at `~/.local/share/applications/echo.desktop` with the following content:
     ```ini
     [Desktop Entry]
-    Version=0.1.0
+    Version=1.0
     Type=Application
     Name=Echo
     Comment=Modern API Client
@@ -49,21 +68,21 @@ To make Echo appear in your system's application menu, follow these steps:
     Terminal=false
     Categories=Development;Network;
     ```
-
-3.  **Update the Desktop Database**
-    This command registers the new application with your system.
+3.  **Update the desktop database**:
     ```bash
     update-desktop-database ~/.local/share/applications/
     ```
-    You should now find "Echo" in your application menu.
+
+---
 
 ## From Source
 
+If you prefer to build the application yourself:
+
 ### Prerequisites
 
-*   **Linux OS** (Ubuntu, Fedora, Arch, etc.)
-*   **Flutter SDK** installed ([Guide](https://docs.flutter.dev/get-started/install/linux))
-*   **Build Tools**: `clang`, `cmake`, `ninja-build`, `pkg-config`, `libgtk-3-dev`
+*   **Flutter SDK** installed ([Guide](https://docs.flutter.dev/get-started/install))
+*   **Platform-specific build tools** (e.g., Visual Studio for Windows, Xcode for macOS, `clang` and `gtk` for Linux).
 
 ### Steps
 
@@ -72,18 +91,11 @@ To make Echo appear in your system's application menu, follow these steps:
     git clone https://github.com/kaikeventura/echo.git
     cd echo
     ```
-
 2.  **Install dependencies:**
     ```bash
     flutter pub get
     ```
-
-3.  **Generate code (Riverpod & Isar):**
+3.  **Run the app:**
     ```bash
-    flutter pub run build_runner build --delete-conflicting-outputs
-    ```
-
-4.  **Run the app:**
-    ```bash
-    flutter run -d linux
+    flutter run
     ```
