@@ -45,8 +45,8 @@ jobs:
       - run: flutter build windows --release
       - name: Prepare Package
         run: |
-          # Caminho corrigido para o build de release do Windows
-          cd build/windows/x64/release
+          # Revertendo para o caminho padrão do build de release do Windows
+          cd build/windows/runner/Release
           Compress-Archive -Path * -DestinationPath ../../../../echo-${{ github.ref_name }}-windows-x64.zip
       - uses: actions/upload-artifact@v4
         with:
