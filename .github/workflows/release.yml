@@ -3,7 +3,10 @@ name: Release
 on:
   push:
     tags:
-      - 'v*' # Dispara apenas quando você sobe uma tag (ex: v0.1.0)
+      - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
   build-linux:
@@ -40,6 +43,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: echo-linux-x64.tar.gz
-          generate_release_notes: true # Isso gera o changelog automático!
+          generate_release_notes: true
           draft: false
           prerelease: false
