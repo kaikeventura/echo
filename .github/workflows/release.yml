@@ -33,8 +33,12 @@ jobs:
       - name: Build Linux Release
         run: flutter build linux --release
 
-      - name: Compress Build
+      - name: Prepare Package
         run: |
+          # Copia o ícone oficial para a pasta do build, renomeando para icon.png
+          cp assets/images/echo_logo.png build/linux/x64/release/bundle/icon.png
+          
+          # Entra na pasta e compacta tudo
           cd build/linux/x64/release/bundle
           tar -czvf ../../../../../echo-linux-x64.tar.gz .
 
