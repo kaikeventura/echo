@@ -9,28 +9,28 @@ permissions:
   contents: write
 
 jobs:
-#  build-linux:
-#    name: Build Linux
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#      - uses: subosito/flutter-action@v2
-#        with:
-#          channel: 'stable'
-#          cache: true
-#      - run: |
-#          sudo apt-get update
-#          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
-#      - run: flutter pub get
-#      - run: flutter build linux --release
-#      - name: Prepare Package
-#        run: |
-#          cd build/linux/x64/release/bundle
-#          tar -czvf ../../../../../echo-${{ github.ref_name }}-linux-x64.tar.gz .
-#      - uses: actions/upload-artifact@v4
-#        with:
-#          name: echo-${{ github.ref_name }}-linux-x64
-#          path: echo-${{ github.ref_name }}-linux-x64.tar.gz
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+      - run: flutter pub get
+      - run: flutter build linux --release
+      - name: Prepare Package
+        run: |
+          cd build/linux/x64/release/bundle
+          tar -czvf ../../../../../echo-${{ github.ref_name }}-linux-x64.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: echo-${{ github.ref_name }}-linux-x64
+          path: echo-${{ github.ref_name }}-linux-x64.tar.gz
 
   build-windows:
     name: Build Windows
@@ -43,8 +43,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build windows --release
-      
-      # Passo de debug melhorado e posicionado antes da falha potencial
+
       - name: Debug Build Directory
         shell: bash
         run: |
@@ -62,30 +61,29 @@ jobs:
           name: echo-${{ github.ref_name }}-windows-x64
           path: echo-${{ github.ref_name }}-windows-x64.zip
 
-#  build-macos:
-#    name: Build macOS
-#    runs-on: macos-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#      - uses: subosito/flutter-action@v2
-#        with:
-#          channel: 'stable'
-#          cache: true
-#      - run: flutter pub get
-#      - run: flutter build macos --release
-#      - name: Prepare Package
-#        run: |
-#          cd build/macos/Build/Products/Release
-#          zip -r ../../../../echo-${{ github.ref_name }}-macos.zip . -x "*.DS_Store"
-#      - uses: actions/upload-artifact@v4
-#        with:
-#          name: echo-${{ github.ref_name }}-macos
-#          path: build/macos/echo-${{ github.ref_name }}-macos.zip
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - run: flutter pub get
+      - run: flutter build macos --release
+      - name: Prepare Package
+        run: |
+          cd build/macos/Build/Products/Release
+          zip -r ../../../../echo-${{ github.ref_name }}-macos.zip . -x "*.DS_Store"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: echo-${{ github.ref_name }}-macos
+          path: build/macos/echo-${{ github.ref_name }}-macos.zip
 
   release:
     name: Create Release
-#    needs: [build-linux, build-windows, build-macos]
-    needs: [build-windows]
+    needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
