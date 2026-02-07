@@ -75,11 +75,11 @@ jobs:
       - name: Prepare Package
         run: |
           cd build/macos/Build/Products/Release
-          zip -r ../../../../echo-${{ github.ref_name }}-macos.zip . -x "*.DS_Store"
+          zip -r $GITHUB_WORKSPACE/echo-${{ github.ref_name }}-macos.zip . -x "*.DS_Store"
       - uses: actions/upload-artifact@v4
         with:
           name: echo-${{ github.ref_name }}-macos
-          path: build/macos/echo-${{ github.ref_name }}-macos.zip
+          path: echo-${{ github.ref_name }}-macos.zip
 
   release:
     name: Create Release
