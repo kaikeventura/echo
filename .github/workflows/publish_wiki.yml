@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - 'docs/**'
+      - '.github/workflows/publish_wiki.yml'
+  workflow_dispatch:
 
 jobs:
   publish-wiki:
@@ -18,4 +20,3 @@ jobs:
         uses: Andrew-Chen-Wang/github-wiki-action@v4
         with:
           path: docs
-          token: ${{ secrets.GITHUB_TOKEN }}
